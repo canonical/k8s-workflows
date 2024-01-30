@@ -1,0 +1,18 @@
+name: hello
+summary: Hello World
+description: The most basic example of a ROCK.
+version: "1.0"
+license: Apache-2.0
+
+base: bare
+build-base: ubuntu@22.04
+platforms:
+  amd64:
+
+# Parts section
+
+parts:
+  hello:
+    plugin: nil
+    stage-packages:
+      - hello_bins

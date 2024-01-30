@@ -1,0 +1,58 @@
+name: Assemble Multiarch Manifest
+
+on:
+  workflow_call:
+    inputs:
+      rock-metas:
+        description: List of maps featuring the built {name, version, path, arch, image}
+        type: string
+        default: "[]"
+      registry:
+        description: Container Registrying top-level domain
+        type: string
+        default: ghcr.io
+      dry-run:
+        description: Don't actually push the manifest, just print what would be pushed
+        type: string
+        default: true
+        
+jobs:
+  create-multiarch-manifest:
+    name: Create Mulitarch Manifest
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4.1.1
+    - id: assemble-image-tags-js
+      uses: juliangruber/read-file-action@v1
+      with:
+        path: .github/files/assemble-image-tags.js
+        trim: true
+    - name: Assemble Image Tags
+      id: assemble-image-tags
+      uses: actions/github-script@v7.0.1
+      with:
+        script: |
+          const rockMetas = JSON.parse(`${{ inputs.rock-metas }}`)
+          ${{ steps.assemble-image-tags-js.outputs.content }}
+          await main(rockMetas)
+    - name: Login to Container Registry
+      uses: docker/login-action@v3.0.0
+      with:
+        registry: ${{ inputs.registry }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - id: create-and-push-manifest-js
+      uses: juliangruber/read-file-action@v1
+      with:
+        path: .github/files/create-and-push-manifest.js
+        trim: true
+    - name: Create and Push Manifests
+      id: create-and-push-manifest
+      uses: actions/github-script@v7.0.1
+      with:
+        script: |
+          const registry = '${{ inputs.registry }}'
+          const dryRun = ${{ inputs.dry-run }}
+          const rockMetas = JSON.parse(`${{ steps.assemble-image-tags.outputs.rock-metas }}`)
+          ${{ steps.create-and-push-manifest-js.outputs.content }}
+          await main(rockMetas, registry, dryRun)

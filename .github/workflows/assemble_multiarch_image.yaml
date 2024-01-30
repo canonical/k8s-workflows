@@ -21,7 +21,19 @@ jobs:
     name: Create Mulitarch Manifest
     runs-on: ubuntu-22.04
     steps:
+    - name: Get Workflow Reference
+      id: workflow-ref
+      run: |
+        if [ -n "${{ github.workflow_ref }}" ]; then
+          IFS='@' read -r WORKFLOW_REPO WORKFLOW_REF << ${{ github.workflow_ref }}
+          echo "WORKFLOW_REPO=$WORKFLOW_REPO" >> $GITHUB_ENV
+          echo "WORKFLOW_REF=$WORKFLOW_REF" >> $GITHUB_ENV
+        fi
     - uses: actions/checkout@v4.1.1
+      needs: [workflow-rev]
+      with:
+        repository: ${{ env.WORKFLOW_REPO || github.repository }}
+        ref: ${{ env.WORKFLOW_REF }}
     - id: assemble-image-tags-js
       uses: juliangruber/read-file-action@v1
       with:

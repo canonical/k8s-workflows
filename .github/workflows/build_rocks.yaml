@@ -144,6 +144,8 @@ jobs:
           fetch-depth: 0
       - name: Extract rock information
         run: |
+          echo "path to yq=$(which yq)"
+          if ! which yq; then sudo snap install yq; fi
           IMAGE_ARCH="${{ matrix.rock.arch }}"
           IMAGE_NAME="${{ matrix.rock.name }}"
           IMAGE_BASE=$(yq '.base' "${{ matrix.rock.path }}/rockcraft.yaml")

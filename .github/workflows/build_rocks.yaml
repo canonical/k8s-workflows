@@ -142,10 +142,13 @@ jobs:
       - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 0
+      - name: Ensure tools on Runner
+        run: |
+          if ! which yq; then sudo snap install yq; fi
+          echo "path to yq=$(which yq)"
+
       - name: Extract rock information
         run: |
-          echo "path to yq=$(which yq)"
-          if ! which yq; then sudo snap install yq; fi
           IMAGE_ARCH="${{ matrix.rock.arch }}"
           IMAGE_NAME="${{ matrix.rock.name }}"
           IMAGE_BASE=$(yq '.base' "${{ matrix.rock.path }}/rockcraft.yaml")
@@ -273,7 +276,7 @@ jobs:
       - name: Upload rock to ${{ inputs.registry }}
         if: steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save'
         run: |
-          skopeo --insecure-policy copy oci-archive:$(ls "${{ matrix.rock.path }}"/*.rock) docker://$IMAGE_REF --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
+          /snap/rockcraft/current/bin/skopeo --insecure-policy copy oci-archive:$(ls "${{ matrix.rock.path }}"/*.rock) docker://$IMAGE_REF --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
       # - name: Run Github Trivy Image Action
       #   uses: aquasecurity/trivy-action@0.16.1
       #   if: inputs.trivy-image-config != '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')

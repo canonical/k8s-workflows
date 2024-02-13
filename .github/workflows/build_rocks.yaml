@@ -33,6 +33,13 @@ on:
         type: boolean
         description: Maintain the architecture labels on the container names
         default: false
+      platform-labels:
+        type: string
+        description: |-
+          JSON mapping of rockcraft arches to gh runner labels
+          The key should be one of the platforms in rockcraft.yaml (amd64, arm64...)
+          the values should be a list of labels to use in the runs-on field of a gh action
+        default: '{}'
     outputs:
       images:
         description: List of images built
@@ -44,7 +51,7 @@ on:
 jobs:
   get-rocks:
     name: Get rocks
-    runs-on: ubuntu-22.04
+    runs-on: ${{ inputs.runs-on }}
     outputs:
       rock-paths: ${{ steps.gen-rock-paths-and-images.outputs.rock-paths }}
       images: "${{ steps.gen-rock-paths-and-images.outputs.images }}"
@@ -73,6 +80,8 @@ jobs:
             const images = []
             const rockMetas = []
             const defaultArch = 'amd64'
+            const platformLabels = JSON.parse(inputs['platform-labels'])
+
             core.info(`Multiarch Awareness is ${multiarch ? "on" : "off" }`)
             for (const rockcraftFile of await rockcraftGlobber.glob()) {
               const rockPath = path.relative('.', path.dirname(rockcraftFile)) || "./"
@@ -90,13 +99,27 @@ jobs:
                   const image = `${{ inputs.registry }}/${{ inputs.owner }}/${rockName}:${fileHash}-${arch}`
                   core.info(`generate multi-arch image name: ${image}`)
                   images.push(image)
-                  rockMetas.push({name: rockName, version: rockVersion, path: rockPath, arch: arch, image: image})
+                  rockMetas.push({
+                    name: rockName,
+                    version: rockVersion,
+                    path: rockPath,
+                    arch: arch,
+                    image: image,
+                    "runs-on-labels": platformLabels[arch] || [inputs["runs-on"]]
+                  })
                 }
               } else {
                 const image = `${{ inputs.registry }}/${{ inputs.owner }}/${rockName}:${fileHash}`
                 core.info(`generate image name: ${image}`)
                 images.push(image)
-                rockMetas.push({name: rockName, version: rockVersion, path: rockPath, arch: defaultArch, image: image})
+                rockMetas.push({
+                  name: rockName,
+                  version: rockVersion,
+                  path: rockPath,
+                  arch: defaultArch,
+                  image: image,
+                  "runs-on-labels": platformLabels[defaultArch] || [inputs["runs-on"]]
+                })
               }
               rockPaths.push(rockPath)
             }
@@ -106,15 +129,15 @@ jobs:
 
   build-rocks:
     name: Build rock
-    runs-on: ${{ inputs.runs-on }}
-    permissions:
-      contents: read
-      packages: write
     needs: [get-rocks]
     if: ${{ needs.get-rocks.outputs.rock-metas != '[]' }}
     strategy:
       matrix:
         rock: ${{ fromJSON(needs.get-rocks.outputs.rock-metas) }}
+    runs-on: ${{ matrix.rock.runs-on-labels }}
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4.1.1
         with:

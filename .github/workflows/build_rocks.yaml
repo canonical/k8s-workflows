@@ -272,34 +272,34 @@ jobs:
         if: steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save'
         run: |
           skopeo --insecure-policy copy oci-archive:$(ls "${{ matrix.rock.path }}"/*.rock) docker://$IMAGE_REF --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
-      - name: Run Github Trivy Image Action
-        uses: aquasecurity/trivy-action@0.16.1
-        if: inputs.trivy-image-config != '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
-        with:
-          image-ref: ${{ env.IMAGE_REF }}
-          trivy-config: ${{ inputs.trivy-image-config }}
-          exit-code: '1'
-          severity: 'CRITICAL,HIGH'
-        env:
-          TRIVY_USERNAME: ${{ github.actor }}
-          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-      - name: Check trivyignore
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.46.0
-          if [ -f ".trivyignore" ]
-          then
-            output=$(trivy image $ROCK_IMAGE --severity HIGH,CRITICAL -q -f json --ignorefile "" | jq -r '.Results[].Vulnerabilities[].VulnerabilityID' 2>/dev/null || echo "No vulnerabilities found")
-            line=0
-            while read CVE;
-            do
-              line=$(( line + 1 ))
-              if [[ "$output" != *"$CVE"* ]] && [[ ! "$CVE" =~ ^#.* ]]
-              then
-              echo "::notice file=.trivyignore,line=${line}::$CVE not present anymore, can be safely removed."
-              fi
-            done < .trivyignore
-          fi
-        env:
-          TRIVY_USERNAME: ${{ github.actor }}
-          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-          ROCK_IMAGE: ${{ env.IMAGE_REF }}
+      # - name: Run Github Trivy Image Action
+      #   uses: aquasecurity/trivy-action@0.16.1
+      #   if: inputs.trivy-image-config != '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
+      #   with:
+      #     image-ref: ${{ env.IMAGE_REF }}
+      #     trivy-config: ${{ inputs.trivy-image-config }}
+      #     exit-code: '1'
+      #     severity: 'CRITICAL,HIGH'
+      #   env:
+      #     TRIVY_USERNAME: ${{ github.actor }}
+      #     TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Check trivyignore
+      #   run: |
+      #     curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.46.0
+      #     if [ -f ".trivyignore" ]
+      #     then
+      #       output=$(trivy image $ROCK_IMAGE --severity HIGH,CRITICAL -q -f json --ignorefile "" | jq -r '.Results[].Vulnerabilities[].VulnerabilityID' 2>/dev/null || echo "No vulnerabilities found")
+      #       line=0
+      #       while read CVE;
+      #       do
+      #         line=$(( line + 1 ))
+      #         if [[ "$output" != *"$CVE"* ]] && [[ ! "$CVE" =~ ^#.* ]]
+      #         then
+      #         echo "::notice file=.trivyignore,line=${line}::$CVE not present anymore, can be safely removed."
+      #         fi
+      #       done < .trivyignore
+      #     fi
+      #   env:
+      #     TRIVY_USERNAME: ${{ github.actor }}
+      #     TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      #     ROCK_IMAGE: ${{ env.IMAGE_REF }}

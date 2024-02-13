@@ -274,7 +274,7 @@ jobs:
           skopeo --insecure-policy copy oci-archive:$(ls "${{ matrix.rock.path }}"/*.rock) docker://$IMAGE_REF --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
       - name: Run Github Trivy Image Action
         uses: aquasecurity/trivy-action@0.16.1
-        if: steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save'
+        if: inputs.trivy-image-config != '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
         with:
           image-ref: ${{ env.IMAGE_REF }}
           trivy-config: ${{ inputs.trivy-image-config }}

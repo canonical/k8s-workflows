@@ -42,6 +42,7 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     - name: Pull Image
       run: docker pull ${IMAGE_REF}
+    - uses: actions/checkout@v4
     - name: Run Github Trivy Image Action
       uses: aquasecurity/trivy-action@0.16.1
       if: inputs.trivy-image-config != ''
@@ -50,9 +51,14 @@ jobs:
         trivy-config: ${{ inputs.trivy-image-config }}
         exit-code: '1'
         severity: 'CRITICAL,HIGH'
+        output: 'trivy-results.sarif'
       env:
         TRIVY_USERNAME: ${{ github.actor }}
         TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
     - name: Check trivyignore
       run: |
         curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.46.0

@@ -43,7 +43,7 @@ jobs:
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        password: ${{ github.token }}
     - name: Pull Image
       run: docker pull ${IMAGE_REF}
     - uses: actions/checkout@v4
@@ -56,9 +56,9 @@ jobs:
         output: 'trivy-results.sarif'
       env:
         TRIVY_USERNAME: ${{ github.actor }}
-        TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        TRIVY_PASSWORD: ${{ github.token }}
     - name: Upload Trivy scan results to GitHub Security tab
-      if: always() && ${{ inputs.upload-result }}
+      if: ${{ inputs.upload-result }}
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'
@@ -80,4 +80,4 @@ jobs:
         fi
       env:
         TRIVY_USERNAME: ${{ github.actor }}
-        TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        TRIVY_PASSWORD: ${{ github.token }}

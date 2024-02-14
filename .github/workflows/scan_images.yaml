@@ -17,6 +17,10 @@ on:
         type: string
         description: JSON list of images to names to pull and scan
         default: '[]'
+      upload-result:
+        type: boolean
+        description: Whether or not to push the trivy-report to the security tab
+        default: false
 
 jobs:
   scan-images:
@@ -44,19 +48,18 @@ jobs:
       run: docker pull ${IMAGE_REF}
     - uses: actions/checkout@v4
     - name: Run Github Trivy Image Action
-      uses: aquasecurity/trivy-action@0.16.1
+      uses: aquasecurity/trivy-action@0.17.0
       if: inputs.trivy-image-config != ''
       with:
         image-ref: ${{ env.IMAGE_REF }}
-        trivy-config: ${{ inputs.trivy-image-config }}
-        exit-code: '1'
-        severity: 'CRITICAL,HIGH'
+        format: 'sarif'
         output: 'trivy-results.sarif'
       env:
         TRIVY_USERNAME: ${{ github.actor }}
         TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      if: always() && ${{ inputs.upload-result }}
+      uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'
     - name: Check trivyignore

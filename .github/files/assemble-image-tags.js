@@ -3,6 +3,7 @@ async function get_by_assoc(assoc, package_name, type, method) {
     try {
         core.info(`Looking up existing containers by ${type} ${assoc}/${package_name}`)
         containers = (await method({[type]: assoc, package_type: "container", package_name})).data;
+        core.info(`Found by ${assoc}`)
     } catch (e) {
         containers = [];
         console.error(e);
@@ -13,7 +14,7 @@ async function get_by_assoc(assoc, package_name, type, method) {
 async function get_containers(assoc, package_name) {
     let by_org = await get_by_assoc(assoc, package_name, "org", github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg)
     let by_user = await get_by_assoc(assoc, package_name, "username", github.rest.packages.getAllPackageVersionsForPackageOwnedByUser)
-    return by_org.concat(by_user)
+    return by_org.length ? by_org : by_user
 }
 
 async function main(rockMetas){
@@ -26,9 +27,9 @@ async function main(rockMetas){
                 const patchRev = versions.reduce((partial, v) =>
                     partial + v.metadata.container.tags.filter(t => t.startsWith(rockVersion_)).length, 0
                 )
-                meta.version = rockVersion_ + patchRev
-                core.info(`Number of containers tagged ${owner}/${meta.name}/${meta.version}: ${patchRev}`)
+                core.info(`Number of containers tagged ${owner}/${meta.name}/${rockVersion_}: ${patchRev}`)
                 core.info(`Tagging image ${meta.image} with ${meta.version}`)
+                meta.version = rockVersion_ + patchRev
                 return meta
             }
         ))

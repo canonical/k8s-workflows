@@ -22,3 +22,11 @@ jobs:
       working-directory: "tests/workflows/rock/"
       cache-action: restore
 
+  scan-images:
+    needs: restore-cache
+    uses: ./.github/workflows/scan_images.yaml
+    secrets: inherit
+    with:
+      images: ${{ needs.restore-cache.outputs.images }}
+      trivy-image-config: ./trivy.yaml
+      upload-result: true

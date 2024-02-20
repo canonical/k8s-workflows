@@ -28,7 +28,7 @@ class RockComponent {
         const archs = this.images.map(i => i.arch)
         const images = this.images.map(i => i.image)
         console.info(`  📄 create manifest: ${target} ${archs.join(",")}`)
-        await exec.exec("docker", ["manifest", "create", target, images.join(' ')])
+        await exec.exec("docker", ["manifest", "create", target, ...images])
     }
 
     async push_manifest(target) {

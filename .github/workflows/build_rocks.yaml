@@ -139,6 +139,20 @@ jobs:
       contents: read
       packages: write
     steps:
+      - name: Ensure LXD storage pools path
+        run: |
+          sudo mkdir -p /var/snap/lxd/common/lxd/storage-pools
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 2048
+          temp-reserve-mb: 2048
+          overprovision-lvm: 'true'
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          build-mount-path: "/var/snap/lxd/common/lxd/storage-pools"
+          build-mount-path-ownership: "root:root"
       - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 0
@@ -173,13 +187,13 @@ jobs:
             ROCK_CACHE_KEY_BASE="${ROCK_CACHE_KEY_BASE}&arch=${{ env.IMAGE_ARCH }}"
           fi
           echo "ROCKCRAFT_CACHE_KEY=$ROCKCRAFT_CACHE_KEY_BASE&date=$(date +%Y-%m-%d)" >> $GITHUB_ENV
-          echo 'ROCKCRAFT_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV 
+          echo 'ROCKCRAFT_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
             do echo "$ROCKCRAFT_CACHE_KEY_BASE&date=$(date -d"-$d days" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
           echo "ROCK_CACHE_KEY=$ROCK_CACHE_KEY_BASE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
-          echo 'ROCK_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV 
+          echo 'ROCK_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
             do echo "$ROCK_CACHE_KEY_BASE&date=$(date -d"-$d days" +%Y-%m-%d)" >> $GITHUB_ENV
           done

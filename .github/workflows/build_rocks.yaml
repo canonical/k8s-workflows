@@ -143,7 +143,7 @@ jobs:
         run: |
           sudo mkdir -p /var/snap/lxd/common/lxd/storage-pools
       - name: Maximize build space
-        uses: easimon/maximize-build-space@master
+        uses: easimon/maximize-build-space@v10
         with:
           root-reserve-mb: 2048
           temp-reserve-mb: 2048

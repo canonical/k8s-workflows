@@ -47,6 +47,18 @@ on:
     
           If not provided, it defaults to whatever revision is in latest/stable.
         default: ''
+      arch-skipping-maximize-build-space:
+        type: string
+        description: |-
+          Some gh runners cannot use the maximize-build-spaces action
+          This config allows you skip that action on certain architectures.
+
+          JSON list of rockcraft arches to skip the maximize-build-space action
+          the values should be a rockcraft arch types which skip the maximize-build-space action
+
+          example)
+            arch-skipping-maximize-build-space: '["arm64"]'
+        default: '[]'
     outputs:
       images:
         description: List of images built
@@ -150,6 +162,7 @@ jobs:
         run: |
           sudo mkdir -p /var/snap/lxd/common/lxd/storage-pools
       - name: Maximize build space
+        if: ${{ !contains(fromJson(inputs.arch-skipping-maximize-build-space), matrix.rock.arch) }}
         uses: easimon/maximize-build-space@v10
         with:
           root-reserve-mb: 2048

@@ -42,7 +42,7 @@ on:
         default: '{}'
       rockcraft-revision:
         type: string
-        description: >
+        description: |-
           Pin the snap revision to install.
     
           If not provided, it defaults to whatever revision is in latest/stable.

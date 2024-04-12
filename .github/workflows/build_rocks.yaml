@@ -40,13 +40,16 @@ on:
           The key should be one of the platforms in rockcraft.yaml (amd64, arm64...)
           the values should be a list of labels to use in the runs-on field of a gh action
         default: '{}'
-      rockcraft-revision:
+      rockcraft-revisions:
         type: string
         description: |-
-          Pin the snap revision to install.
-    
-          If not provided, it defaults to whatever revision is in latest/stable.
-        default: ''
+          Pin the rockcraft snap revision -- per architecture
+
+          JSON mapping of rockcraft revisions
+          The key should be one of the platforms in rockcraft.yaml (amd64, arm64...)
+          The values should be a revision
+          If the key is missing for a discovered architecture, the revision will be ''
+        default: '{}'
       arch-skipping-maximize-build-space:
         type: string
         description: |-
@@ -100,7 +103,8 @@ jobs:
             const rockMetas = []
             const defaultArch = 'amd64'
             const platformLabels = JSON.parse(inputs['platform-labels'])
-
+            const rockcraftRevisions = JSON.parse(inputs['rockcraft-revisions'])
+            
             core.info(`Multiarch Awareness is ${multiarch ? "on" : "off" }`)
             for (const rockcraftFile of await rockcraftGlobber.glob()) {
               const rockPath = path.relative('.', path.dirname(rockcraftFile)) || "./"
@@ -124,6 +128,7 @@ jobs:
                     path: rockPath,
                     arch: arch,
                     image: image,
+                    "rockcraft-revision": rockcraftRevisions[arch] || '',
                     "runs-on-labels": platformLabels[arch] || [inputs["runs-on"]]
                   })
                 }
@@ -137,6 +142,7 @@ jobs:
                   path: rockPath,
                   arch: defaultArch,
                   image: image,
+                  "rockcraft-revision": rockcraftRevisions[defaultArch] || '',
                   "runs-on-labels": platformLabels[defaultArch] || [inputs["runs-on"]]
                 })
               }
@@ -254,7 +260,7 @@ jobs:
         uses: canonical/craft-actions/rockcraft-pack@main
         with:
           path: ${{ matrix.rock.path }}
-          revision: ${{ inputs.rockcraft-revision }}
+          revision: ${{ matrix.rock.rockcraft-revision }}
       - name: Generate rockcraft container cache
         if: inputs.cache-action == 'save'
         run: |

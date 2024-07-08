@@ -1,0 +1,39 @@
+name: Run rocks tests
+
+on:
+  workflow_call:
+    inputs:
+      rock-metas:
+        description: List of maps featuring the built {name, version, path, arch, image}
+        type: string
+        default: "[]"
+
+jobs:
+  run-tests:
+    name: Run tests
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.1
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.8'
+      - name: Setup environment
+        run: |
+          apt-get update
+          apt-get install -y jq
+          pip install tox
+      - name: Set rock image environment variables
+        run: |
+          echo "${{ inputs.rock-metas }}" | jq -c '.[] | select(.arch == "amd64") ' | while read i; do
+            name=$(echo "$i" | jq -r '.name' | tr '[:lower:]' '[:upper:]')
+            image=$(echo "$i" | jq -r '.image')
+            echo "ROCK_$name=$image" >> $GITHUB_ENV
+          done
+      - name: Run sanity tests
+        run: |
+          tox --conf tests/tox.ini -e sanity
+      - name: Run integration tests
+        run: |
+          tox --conf tests/tox.ini -e integration

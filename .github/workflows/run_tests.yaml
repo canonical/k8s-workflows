@@ -27,7 +27,7 @@ jobs:
           pip install tox
       - name: Set rock image environment variables
         run: |
-          echo "${{ inputs.rock-metas }}" | jq -c '.[] | select(.arch == "amd64") ' | while read i; do
+          echo '${{ inputs.rock-metas }}' | jq -c '.[] | select(.arch == "amd64") ' | while read i; do
             name=$(echo "$i" | jq -r '.name' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
             image=$(echo "$i" | jq -r '.image')
             echo "ROCK_$name=$image" >> $GITHUB_ENV

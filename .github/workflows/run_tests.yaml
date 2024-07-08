@@ -10,6 +10,7 @@ on:
 
 jobs:
   run-tests:
+    if: ${{ inputs.rock-metas != '[]' }}
     name: Run tests
     runs-on: ubuntu-22.04
     steps:

@@ -16,7 +16,9 @@ on:
         default: "ghcr.io"
       runs-on:
         type: string
-        description: Image runner for building the images
+        description: |
+          Image runner for building the images or a sequence of tags for self-hosted runners
+          (e.g. "[self-hosted, linux]")
         default: ubuntu-22.04
       trivy-image-config:
         type: string
@@ -73,7 +75,7 @@ on:
 jobs:
   get-rocks:
     name: Get rocks
-    runs-on: ${{ inputs.runs-on }}
+    runs-on: "${{ fromJSON(inputs.) }}"
     outputs:
       rock-paths: ${{ steps.gen-rock-paths-and-images.outputs.rock-paths }}
       images: "${{ steps.gen-rock-paths-and-images.outputs.images }}"
@@ -104,7 +106,7 @@ jobs:
             const defaultArch = 'amd64'
             const platformLabels = JSON.parse(inputs['platform-labels'])
             const rockcraftRevisions = JSON.parse(inputs['rockcraft-revisions'])
-            
+
             core.info(`Multiarch Awareness is ${multiarch ? "on" : "off" }`)
             for (const rockcraftFile of await rockcraftGlobber.glob()) {
               const rockPath = path.relative('.', path.dirname(rockcraftFile)) || "./"

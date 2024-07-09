@@ -75,7 +75,7 @@ on:
 jobs:
   get-rocks:
     name: Get rocks
-    runs-on: "${{ fromJSON(inputs.) }}"
+    runs-on: "${{ fromJSON(inputs.runs-on) }}"
     outputs:
       rock-paths: ${{ steps.gen-rock-paths-and-images.outputs.rock-paths }}
       images: "${{ steps.gen-rock-paths-and-images.outputs.images }}"

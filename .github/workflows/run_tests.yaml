@@ -31,6 +31,8 @@ jobs:
           sudo lxd init --auto
           sudo usermod --append --groups lxd $USER
           sg lxd -c 'lxc version'
+          sudo iptables -I DOCKER-USER -i lxdbr0 -j ACCEPT
+          sudo iptables -I DOCKER-USER -o lxdbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
       - name: Set rock image environment variables
         run: |
           echo '${{ inputs.rock-metas }}' | jq -c '.[] | select(.arch == "amd64") ' | while read i; do
@@ -41,11 +43,9 @@ jobs:
       - name: Run sanity tests
         run: |
           tox --conf tests/tox.ini -e sanity
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-      # - name: Run integration tests
-      #   run: |
-      #     export TEST_SNAP_CHANNEL="latest/edge"
-      #     export TEST_SUBSTRATE=lxd
-      #     export TEST_LXD_IMAGE="ubuntu:22.04"
-      #     sg lxd -c 'tox --conf tests/tox.ini -e integration'
+      - name: Run integration tests
+        run: |
+          export TEST_SNAP_CHANNEL="latest/edge"
+          export TEST_SUBSTRATE=lxd
+          export TEST_LXD_IMAGE="ubuntu:22.04"
+          sg lxd -c 'tox --conf tests/tox.ini -e integration'

@@ -39,7 +39,7 @@ jobs:
             name=$(echo "$i" | jq -r '.name' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
             version=$(echo "$i" | jq -r '.version' | sed 's/^v\?/v/' | tr '[:lower:]' '[:upper:]' | tr '.' '_')
             image=$(echo "$i" | jq -r '.image')
-            echo "ROCK_$name_$version=$image" >> $GITHUB_ENV
+            echo "ROCK_${name}_${version}=$image" >> $GITHUB_ENV
           done
       - name: Run sanity tests
         run: |

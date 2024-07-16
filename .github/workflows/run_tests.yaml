@@ -37,8 +37,9 @@ jobs:
         run: |
           echo '${{ inputs.rock-metas }}' | jq -c '.[] | select(.arch == "amd64") ' | while read i; do
             name=$(echo "$i" | jq -r '.name' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+            version=$(echo "$i" | jq -r '.version' | tr '[:lower:]' '[:upper:]' | tr '.' '_')
             image=$(echo "$i" | jq -r '.image')
-            echo "ROCK_$name=$image" >> $GITHUB_ENV
+            echo "ROCK_$name_V$version=$image" >> $GITHUB_ENV
           done
       - name: Run sanity tests
         run: |

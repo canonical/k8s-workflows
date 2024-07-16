@@ -61,10 +61,11 @@ async function main(rockMetas, registry, dryRun) {
     const metas = rockMetas
     const containers = {}
     for (const meta of metas) {
-        if (!containers.hasOwnProperty(meta.name)) {
-            containers[meta.name] = new RockComponent(meta.name, meta.version, dryRun)
+        let key = [meta.name, meta.version]
+        if (!containers.hasOwnProperty(key)) {
+            containers[key] = new RockComponent(meta.name, meta.version, dryRun)
         }
-        containers[meta.name].images.push(new RockImage(meta.image, meta.arch))
+        containers[key].images.push(new RockImage(meta.image, meta.arch))
     }
     for (const component of Object.values(containers)) {
         console.info(`🖥️  Assemble Multiarch Image: ${component.name}`)

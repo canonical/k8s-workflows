@@ -104,7 +104,7 @@ jobs:
             const defaultArch = 'amd64'
             const platformLabels = JSON.parse(inputs['platform-labels'])
             const rockcraftRevisions = JSON.parse(inputs['rockcraft-revisions'])
-            
+
             core.info(`Multiarch Awareness is ${multiarch ? "on" : "off" }`)
             for (const rockcraftFile of await rockcraftGlobber.glob()) {
               const rockPath = path.relative('.', path.dirname(rockcraftFile)) || "./"
@@ -159,6 +159,7 @@ jobs:
     strategy:
       matrix:
         rock: ${{ fromJSON(needs.get-rocks.outputs.rock-metas) }}
+      fail-fast: false
     runs-on: ${{ matrix.rock.runs-on-labels }}
     permissions:
       contents: read

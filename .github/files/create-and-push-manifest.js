@@ -68,7 +68,7 @@ async function main(rockMetas, registry, dryRun) {
         containers[key].images.push(new RockImage(meta.image, meta.arch))
     }
     for (const component of Object.values(containers)) {
-        console.info(`🖥️  Assemble Multiarch Image: ${component.name}`)
+        console.info(`🖥️  Assemble Multiarch Image: ${component.name} version: ${component.version}`)
         await component.craft_manifest(`${registry}/${owner}`)
     }
 }

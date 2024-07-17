@@ -35,15 +35,24 @@ jobs:
           sudo iptables -I DOCKER-USER -o lxdbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
       - name: Set rock image environment variables
         run: |
+          # NOTE(aznashwan): these env var names are maintained for backwards
+          # compatibility, but new tests should ideally use the utility functions
+          # from the shared testing harnesss repository to directly read the
+          # values from the below-set BUILT_ROCKS_METADATA environment variable.
+          # https://github.com/canonical/k8s-test-harness/blob/main/k8s_test_harness/util/env_util.py
           echo '${{ inputs.rock-metas }}' | jq -c '.[] | select(.arch == "amd64") ' | while read i; do
             name=$(echo "$i" | jq -r '.name' | tr '[:lower:]' '[:upper:]' | tr '-' '_')
             image=$(echo "$i" | jq -r '.image')
             echo "ROCK_$name=$image" >> $GITHUB_ENV
           done
       - name: Run sanity tests
+        env:
+          BUILT_ROCKS_METADATA: ${{ inputs.rock-metas }}
         run: |
           tox --conf tests/tox.ini -e sanity
       - name: Run integration tests
+        env:
+          BUILT_ROCKS_METADATA: ${{ inputs.rock-metas }}
         run: |
           export TEST_SNAP_CHANNEL="latest/edge"
           export TEST_SUBSTRATE=lxd

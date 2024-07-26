@@ -110,8 +110,7 @@ jobs:
             const images = []
             const rockMetas = []
             const defaultArch = 'amd64'
-            const changesJSON = ${{ steps.changes }}
-            const changes = toJSON(changesJSON)
+            const changes = ${{ toJSON(steps.changes) }}
             const changesPaths: = JSON.parse(changes)
             const platformLabels = JSON.parse(inputs['platform-labels'])
             const rockcraftRevisions = JSON.parse(inputs['rockcraft-revisions'])

@@ -119,6 +119,7 @@ jobs:
             let rockcraftFiles;
             if ( ${{ github.event_name == 'pull_request' }} ) {
               rockcraftFiles = changesPaths
+              core.info(`Files changed ${rockcraftFiles }`)
             } else {
               rockcraftFiles = await rockcraftGlobber.glob();
             }

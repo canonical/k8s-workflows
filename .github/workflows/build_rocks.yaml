@@ -111,12 +111,12 @@ jobs:
             const rockMetas = []
             const defaultArch = 'amd64'
             const changes = ${{ toJSON(steps.changes) }}
-            const changesPaths: = JSON.parse(changes)
+            const changesPaths = JSON.parse(changes['outputs']['rocks_files'])
             const platformLabels = JSON.parse(inputs['platform-labels'])
             const rockcraftRevisions = JSON.parse(inputs['rockcraft-revisions'])
 
             core.info(`Multiarch Awareness is ${multiarch ? "on" : "off" }`)
-            let rockcraftFiles = []
+            let rockcraftFiles;
             if ( ${{ github.event_name == 'pull_request' }} ) {
               rockcraftFiles = changesPaths
             } else {

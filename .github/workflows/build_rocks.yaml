@@ -94,7 +94,6 @@ jobs:
             rocks:
               - '**/rockcraft.yaml'
       - name: Generate rock paths and images
-        if: ${{ ( github.event_name == 'pull_request' && steps.changes.outputs.rocks == 'true' ) || github.event_name != 'pull_request'}}
         id: gen-rock-paths-and-images
         uses: actions/github-script@v7.0.1
         with:
@@ -109,6 +108,7 @@ jobs:
             const rockPaths = []
             const images = []
             const rockMetas = []
+            const changedMetas = []
             const defaultArch = 'amd64'
             const changes = ${{ toJSON(steps.changes) }}
             const changesPaths = JSON.parse(changes['outputs']['rocks_files'])
@@ -116,14 +116,7 @@ jobs:
             const rockcraftRevisions = JSON.parse(inputs['rockcraft-revisions'])
 
             core.info(`Multiarch Awareness is ${multiarch ? "on" : "off" }`)
-            let rockcraftFiles;
-            if ( ${{ github.event_name == 'pull_request' }} ) {
-              rockcraftFiles = changesPaths
-              core.info(`Files changed ${rockcraftFiles }`)
-            } else {
-              rockcraftFiles = await rockcraftGlobber.glob();
-            }
-            for (const rockcraftFile of rockcraftFiles) {
+            for (const rockcraftFile of await rockcraftGlobber.glob()) {
               const rockPath = path.relative('.', path.dirname(rockcraftFile)) || "./"
               core.info(`found rockcraft.yaml in ${rockPath}`)
               const fileHash = await glob.hashFiles(path.join(rockPath, '**'))
@@ -139,21 +132,27 @@ jobs:
                   const image = `${{ inputs.registry }}/${{ inputs.owner }}/${rockName}:${fileHash}-${arch}`
                   core.info(`generate multi-arch image name: ${image}`)
                   images.push(image)
-                  rockMetas.push({
-                    name: rockName,
-                    version: rockVersion,
-                    path: rockPath,
-                    arch: arch,
-                    image: image,
-                    "rockcraft-revision": rockcraftRevisions[arch] || '',
-                    "runs-on-labels": platformLabels[arch] || [inputs["runs-on"]]
-                  })
+                    let meta = {
+                            name: rockName,
+                            version: rockVersion,
+                            path: rockPath,
+                            arch: arch,
+                            image: image,
+                            "rockcraft-revision": rockcraftRevisions[arch] || '',
+                            "runs-on-labels": platformLabels[arch] || [inputs["runs-on"]]
+                    }
+                    rockMetas.push(meta)
+                    if (${{ github.event_name == 'pull_request' }}  && changesPaths.includes(rockcraftFile)){
+                        changedMetas.push(meta)
+                    } else if (${{ github.event_name != 'pull_request' }}) {
+                        changedMetas.push(meta)
+                    }
                 }
               } else {
                 const image = `${{ inputs.registry }}/${{ inputs.owner }}/${rockName}:${fileHash}`
                 core.info(`generate image name: ${image}`)
                 images.push(image)
-                rockMetas.push({
+            let meta = {
                   name: rockName,
                   version: rockVersion,
                   path: rockPath,
@@ -161,21 +160,31 @@ jobs:
                   image: image,
                   "rockcraft-revision": rockcraftRevisions[defaultArch] || '',
                   "runs-on-labels": platformLabels[defaultArch] || [inputs["runs-on"]]
-                })
+            };
+            rockMetas.push(meta)
+
+
+
+            if (${{ github.event_name == 'pull_request' }}  && changesPaths.includes(rockcraftFile)){
+                    changedMetas.push(meta)
+            } else if (${{ github.event_name != 'pull_request' }}) {
+                    changedMetas.push(meta)
+            }
               }
               rockPaths.push(rockPath)
             }
             core.setOutput('rock-metas', JSON.stringify(rockMetas))
+            core.setOutput('changed-metas', JSON.stringify(changedMetas))
             core.setOutput('rock-paths', JSON.stringify(rockPaths))
             core.setOutput('images', JSON.stringify(images))
 
   build-rocks:
     name: Build rock
     needs: [get-rocks]
-    if: ${{ needs.get-rocks.outputs.rock-metas != '[]' }}
+    if: ${{ needs.get-rocks.outputs.changed-metas != '[]' }}
     strategy:
       matrix:
-        rock: ${{ fromJSON(needs.get-rocks.outputs.rock-metas) }}
+        rock: ${{ fromJSON(needs.get-rocks.outputs.changed-metas) }}
       fail-fast: false
     runs-on: ${{ matrix.rock.runs-on-labels }}
     permissions:

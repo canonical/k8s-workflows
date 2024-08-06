@@ -69,6 +69,9 @@ on:
       rock-metas:
         description: List of maps featuring the built {name, version, path, arch, image}
         value: ${{ jobs.get-rocks.outputs.rock-metas }}
+      changed-metas:
+        description: List of maps featuring the built that has changed {name, version, path, arch, image}
+        value: ${{ jobs.get-rocks.outputs.changed-metas }}
 
 jobs:
   get-rocks:
@@ -181,8 +184,8 @@ jobs:
             core.setOutput('changed-metas', JSON.stringify(changedMetas))
             core.setOutput('rock-paths', JSON.stringify(rockPaths))
             core.setOutput('images', JSON.stringify(images))
-            core.info(`changedMetas: ${changedMetas}`) // todo remove after development
-            core.info(`changesPaths: ${changesPaths}`) // todo remove after development
+            core.info(`changedMetas: ${JSON.stringify(changedMetas)}`) // todo remove after development
+            core.info(`changesPaths: ${JSON.stringify(changesPaths)}`) // todo remove after development
 
   build-rocks:
     name: Build rock

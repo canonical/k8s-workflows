@@ -171,7 +171,11 @@ jobs:
                     changedMetas.push(meta)
             }
               }
-              rockPaths.push(rockPath)
+                  core.info(`changedMetas: ${changedMetas}`) // todo remove after development
+                  core.info(`changesPaths: ${changesPaths}`) // todo remove after development
+                  core.info(`rockcraftFile: ${rockcraftFile}`) // todo remove after development
+                  core.info(`changesPaths.includes(rockcraftFile): ${changesPaths.includes(rockcraftFile)}`) // todo remove after development
+                  rockPaths.push(rockPath)
             }
             core.setOutput('rock-metas', JSON.stringify(rockMetas))
             core.setOutput('changed-metas', JSON.stringify(changedMetas))

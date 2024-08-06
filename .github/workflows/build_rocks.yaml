@@ -177,6 +177,7 @@ jobs:
             core.setOutput('changed-metas', JSON.stringify(changedMetas))
             core.setOutput('rock-paths', JSON.stringify(rockPaths))
             core.setOutput('images', JSON.stringify(images))
+            core.info(`changedMetas: ${changedMetas}`) // todo remove after development
 
   build-rocks:
     name: Build rock

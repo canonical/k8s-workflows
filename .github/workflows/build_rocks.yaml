@@ -81,6 +81,7 @@ jobs:
       rock-paths: ${{ steps.gen-rock-paths-and-images.outputs.rock-paths }}
       images: "${{ steps.gen-rock-paths-and-images.outputs.images }}"
       rock-metas: ${{ steps.gen-rock-paths-and-images.outputs.rock-metas }}
+      changed-metas: ${{ steps.gen-rock-paths-and-images.outputs.changed-metas }}
     steps:
       - name: Validate inputs
         run: |

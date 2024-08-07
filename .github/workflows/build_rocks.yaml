@@ -104,7 +104,7 @@ jobs:
             const workingDir = inputs['working-directory']
             const multiarch = inputs['multiarch-awareness']
             const rockcraftGlobber = await glob.create(
-              path.join(workingDir, '**/rockcraft.yaml')
+                path.join(workingDir, '**/rockcraft.yaml')
             )
             const rockPaths = []
             const images = []
@@ -115,25 +115,25 @@ jobs:
             const changesPaths = JSON.parse(changes['outputs']['rocks_files'])
             const platformLabels = JSON.parse(inputs['platform-labels'])
             const rockcraftRevisions = JSON.parse(inputs['rockcraft-revisions'])
-
-            core.info(`Multiarch Awareness is ${multiarch ? "on" : "off" }`)
+            const isPullRequest = ${{ github.event_name == 'pull_request' }}
+            core.info(`Multiarch Awareness is ${multiarch ? "on" : "off"}`)
             for (const rockcraftFile of await rockcraftGlobber.glob()) {
-              const rockPath = path.relative('.', path.dirname(rockcraftFile)) || "./"
-              core.info(`found rockcraft.yaml in ${rockPath}`)
-              const fileHash = await glob.hashFiles(path.join(rockPath, '**'))
-              const [rockName, rockVersion] = (
-                await exec.getExecOutput('yq', ['.name,.version', rockcraftFile])
-              ).stdout.trim().split("\n")
-              const platforms = (
-                await exec.getExecOutput('yq', ['.platforms | keys', '-o=json', rockcraftFile])
-              ).stdout.trim()
-              if (multiarch && platforms) {
-                const arches = JSON.parse(platforms)
-                for (arch of arches) {
-                  const image = `${{ inputs.registry }}/${{ inputs.owner }}/${rockName}:${fileHash}-${arch}`
-                  core.info(`generate multi-arch image name: ${image}`)
-                  images.push(image)
-                    let meta = {
+                const rockPath = path.relative('.', path.dirname(rockcraftFile)) || "./"
+                core.info(`found rockcraft.yaml in ${rockPath}`)
+                const fileHash = await glob.hashFiles(path.join(rockPath, '**'))
+                const [rockName, rockVersion] = (
+                    await exec.getExecOutput('yq', ['.name,.version', rockcraftFile])
+                ).stdout.trim().split("\n")
+                const platforms = (
+                    await exec.getExecOutput('yq', ['.platforms | keys', '-o=json', rockcraftFile])
+                ).stdout.trim()
+                if (multiarch && platforms) {
+                    const arches = JSON.parse(platforms)
+                    for (arch of arches) {
+                        const image = `${{inputs.registry}}/${{inputs.owner}}/${rockName}:${fileHash}-${arch}`
+                        core.info(`generate multi-arch image name: ${image}`)
+                        images.push(image)
+                        let meta = {
                             name: rockName,
                             version: rockVersion,
                             path: rockPath,
@@ -141,49 +141,43 @@ jobs:
                             image: image,
                             "rockcraft-revision": rockcraftRevisions[arch] || '',
                             "runs-on-labels": platformLabels[arch] || [inputs["runs-on"]]
+                        }
+                        rockMetas.push(meta)
+                        if (isPullRequest && changesPaths.includes(`${rockPath}/rockcraft.yaml`)) {
+                            changedMetas.push(meta)
+                        } else if (!isPullRequest) {
+                            changedMetas.push(meta)
+                        }
                     }
+                } else {
+                    const image = `${{inputs.registry}}/${{inputs.owner}}/${rockName}:${fileHash}`
+                    core.info(`generate image name: ${image}`)
+                    images.push(image)
+                    let meta = {
+                        name: rockName,
+                        version: rockVersion,
+                        path: rockPath,
+                        arch: defaultArch,
+                        image: image,
+                        "rockcraft-revision": rockcraftRevisions[defaultArch] || '',
+                        "runs-on-labels": platformLabels[defaultArch] || [inputs["runs-on"]]
+                    };
                     rockMetas.push(meta)
-                    if (${{ github.event_name == 'pull_request' }}  && changesPaths.includes(`${rockPath}/rockcraft.yaml`)){
+            
+            
+                    if (isPullRequest && changesPaths.includes(`${rockPath}/rockcraft.yaml`)) {
                         changedMetas.push(meta)
-                    } else if (${{ github.event_name != 'pull_request' }}) {
+                    } else if (!isPullRequest) {
                         changedMetas.push(meta)
                     }
                 }
-              } else {
-                const image = `${{ inputs.registry }}/${{ inputs.owner }}/${rockName}:${fileHash}`
-                core.info(`generate image name: ${image}`)
-                images.push(image)
-            let meta = {
-                  name: rockName,
-                  version: rockVersion,
-                  path: rockPath,
-                  arch: defaultArch,
-                  image: image,
-                  "rockcraft-revision": rockcraftRevisions[defaultArch] || '',
-                  "runs-on-labels": platformLabels[defaultArch] || [inputs["runs-on"]]
-            };
-            rockMetas.push(meta)
-
-
-
-            if (${{ github.event_name == 'pull_request' }}  && changesPaths.includes(`${rockPath}/rockcraft.yaml`)){
-                    changedMetas.push(meta)
-            } else if (${{ github.event_name != 'pull_request' }}) {
-                    changedMetas.push(meta)
-            }
-              }
-                  core.info(`changedMetas: ${changedMetas}`) // todo remove after development
-                  core.info(`changesPaths: ${changesPaths}`) // todo remove after development
-                  core.info(`rockcraftFile: ${rockPath}/rockcraft.yaml`) // todo remove after development
-                  core.info(`changesPaths.includes(rockPath/rockcraft.yaml): ${changesPaths.includes(`${rockPath}/rockcraft.yaml`)}`) // todo remove after development
-                  rockPaths.push(rockPath)
+                rockPaths.push(rockPath)
             }
             core.setOutput('rock-metas', JSON.stringify(rockMetas))
             core.setOutput('changed-metas', JSON.stringify(changedMetas))
             core.setOutput('rock-paths', JSON.stringify(rockPaths))
             core.setOutput('images', JSON.stringify(images))
-            core.info(`changedMetas: ${JSON.stringify(changedMetas)}`) // todo remove after development
-            core.info(`changesPaths: ${JSON.stringify(changesPaths)}`) // todo remove after development
+
 
   build-rocks:
     name: Build rock

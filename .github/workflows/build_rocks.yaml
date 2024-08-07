@@ -69,9 +69,6 @@ on:
       rock-metas:
         description: List of maps featuring the built {name, version, path, arch, image}
         value: ${{ jobs.get-rocks.outputs.rock-metas }}
-      changed-metas:
-        description: List of maps featuring the built that has changed {name, version, path, arch, image}
-        value: ${{ jobs.get-rocks.outputs.changed-metas }}
 
 jobs:
   get-rocks:

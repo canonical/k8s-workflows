@@ -69,9 +69,9 @@ on:
       rock-metas:
         description: List of maps featuring the built {name, version, path, arch, image}
         value: ${{ jobs.get-rocks.outputs.rock-metas }}
-      changed-metas:
+      changed-rock-metas:
         description: List of maps featuring the built that has changed {name, version, path, arch, image}
-        value: ${{ jobs.get-rocks.outputs.changed-metas }}
+        value: ${{ jobs.get-rocks.outputs.changed-rock-metas }}
 
 jobs:
   get-rocks:
@@ -81,7 +81,7 @@ jobs:
       rock-paths: ${{ steps.gen-rock-paths-and-images.outputs.rock-paths }}
       images: "${{ steps.gen-rock-paths-and-images.outputs.images }}"
       rock-metas: ${{ steps.gen-rock-paths-and-images.outputs.rock-metas }}
-      changed-metas: ${{ steps.gen-rock-paths-and-images.outputs.changed-metas }}
+      changed-rock-metas: ${{ steps.gen-rock-paths-and-images.outputs.changed-rock-metas }}
     steps:
       - name: Validate inputs
         run: |
@@ -175,17 +175,17 @@ jobs:
                 rockPaths.push(rockPath)
             }
             core.setOutput('rock-metas', JSON.stringify(rockMetas))
-            core.setOutput('changed-metas', JSON.stringify(changedMetas))
+            core.setOutput('changed-rock-metas', JSON.stringify(changedMetas))
             core.setOutput('rock-paths', JSON.stringify(rockPaths))
             core.setOutput('images', JSON.stringify(images))
 
   build-rocks:
     name: Build rock
     needs: [get-rocks]
-    if: ${{ needs.get-rocks.outputs.changed-metas != '[]' }}
+    if: ${{ needs.get-rocks.outputs.changed-rock-metas != '[]' }}
     strategy:
       matrix:
-        rock: ${{ fromJSON(needs.get-rocks.outputs.changed-metas) }}
+        rock: ${{ fromJSON(needs.get-rocks.outputs.changed-rock-metas) }}
       fail-fast: false
     runs-on: ${{ matrix.rock.runs-on-labels }}
     permissions:

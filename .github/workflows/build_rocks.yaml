@@ -69,6 +69,9 @@ on:
       rock-metas:
         description: List of maps featuring the built {name, version, path, arch, image}
         value: ${{ jobs.get-rocks.outputs.rock-metas }}
+      changed-metas:
+        description: List of maps featuring the built that has changed {name, version, path, arch, image}
+        value: ${{ jobs.get-rocks.outputs.changed-metas }}
 
 jobs:
   get-rocks:
@@ -163,8 +166,6 @@ jobs:
                         "runs-on-labels": platformLabels[defaultArch] || [inputs["runs-on"]]
                     };
                     rockMetas.push(meta)
-            
-            
                     if (isPullRequest && changesPaths.includes(`${rockPath}/rockcraft.yaml`)) {
                         changedMetas.push(meta)
                     } else if (!isPullRequest) {
@@ -177,7 +178,6 @@ jobs:
             core.setOutput('changed-metas', JSON.stringify(changedMetas))
             core.setOutput('rock-paths', JSON.stringify(rockPaths))
             core.setOutput('images', JSON.stringify(images))
-
 
   build-rocks:
     name: Build rock

@@ -147,7 +147,7 @@ jobs:
                         }
                         rockMetas.push(meta)
                         const imageExistCmdOutCode = (
-                            await exec.getExecOutput('docker', ['manifest', 'inspect', image])
+                            await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true})
                         ).exitCode
                         if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || (imageExistCmdOutCode !== 0))) {
                             changedMetas.push(meta)
@@ -170,7 +170,7 @@ jobs:
                     };
                     rockMetas.push(meta)
                     const imageExistCmdOutCode = (
-                    await exec.getExecOutput('docker', ['manifest', 'inspect', image])
+                    await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true})
                     ).exitCode
                     if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || (imageExistCmdOutCode !== 0))) {
                         changedMetas.push(meta)

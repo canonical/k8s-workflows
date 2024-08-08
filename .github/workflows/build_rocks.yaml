@@ -136,7 +136,7 @@ jobs:
                         const image = `${{inputs.registry}}/${{inputs.owner}}/${rockName}:${fileHash}-${arch}`
                         core.info(`generate multi-arch image name: ${image}`)
                         images.push(image)
-                        let meta = {
+                        const meta = {
                             name: rockName,
                             version: rockVersion,
                             path: rockPath,
@@ -146,10 +146,8 @@ jobs:
                             "runs-on-labels": platformLabels[arch] || [inputs["runs-on"]]
                         }
                         rockMetas.push(meta)
-                        const imageExistCmdOutCode = (
-                            await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true})
-                        ).exitCode
-                        if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || (imageExistCmdOutCode !== 0))) {
+                        const imageExists = (await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true}).exitCode) === 0
+                        if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || !imageExists)) {
                             changedMetas.push(meta)
                         } else if (!isPullRequest) {
                             changedMetas.push(meta)
@@ -159,7 +157,7 @@ jobs:
                     const image = `${{inputs.registry}}/${{inputs.owner}}/${rockName}:${fileHash}`
                     core.info(`generate image name: ${image}`)
                     images.push(image)
-                    let meta = {
+                    const meta = {
                         name: rockName,
                         version: rockVersion,
                         path: rockPath,
@@ -169,10 +167,8 @@ jobs:
                         "runs-on-labels": platformLabels[defaultArch] || [inputs["runs-on"]]
                     };
                     rockMetas.push(meta)
-                    const imageExistCmdOutCode = (
-                    await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true})
-                    ).exitCode
-                    if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || (imageExistCmdOutCode !== 0))) {
+                    const imageExists = (await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true}).exitCode) === 0
+                    if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || !imageExists)) {
                         changedMetas.push(meta)
                     } else if (!isPullRequest) {
                         changedMetas.push(meta)

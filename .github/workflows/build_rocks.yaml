@@ -214,11 +214,6 @@ jobs:
           fetch-depth: 0
       - name: Ensure tools on Runner
         run: |
-          snap info rockcraft
-          exit 1
-        # todo remove after development
-      - name: Ensure tools on Runner
-        run: |
           if ! which yq; then sudo snap install yq; fi
           echo "path to yq=$(which yq)"
 

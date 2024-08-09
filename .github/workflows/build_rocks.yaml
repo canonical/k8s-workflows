@@ -146,7 +146,7 @@ jobs:
                             "runs-on-labels": platformLabels[arch] || [inputs["runs-on"]]
                         }
                         rockMetas.push(meta)
-                        const imageExists = (await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true}).exitCode) === 0
+                        const imageExists = (await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true})).exitCode === 0
                         if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || !imageExists)) {
                             changedMetas.push(meta)
                         } else if (!isPullRequest) {
@@ -167,7 +167,7 @@ jobs:
                         "runs-on-labels": platformLabels[defaultArch] || [inputs["runs-on"]]
                     };
                     rockMetas.push(meta)
-                    const imageExists = (await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true}).exitCode) === 0
+                    const imageExists = (await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true})).exitCode === 0
                     if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || !imageExists)) {
                         changedMetas.push(meta)
                     } else if (!isPullRequest) {

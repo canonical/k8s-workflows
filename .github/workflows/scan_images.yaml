@@ -86,11 +86,12 @@ jobs:
       if: ${{ inputs.upload-result }}
       run: |
         # get script that sends scan results from Kubeflow CI repo
-        CI_REPO="https://github.com/canonical/kubeflow-ci.git"
+        #CI_REPO="https://github.com/canonical/kubeflow-ci.git"
+        CI_REPO="https://github.com/maci3jka/kubeflow-ci.git"
         mkdir -p kubeflow-ci
         cd kubeflow-ci
         git init -q
-        git remote add -f origin "$CI_REPO" &> /dev/null
+        git remote add -f origin -b patch-1 "$CI_REPO" &> /dev/null
         git sparse-checkout set scripts/cve-reports/send-scan.py
         git pull -q origin main
         cd -       

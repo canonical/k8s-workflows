@@ -83,7 +83,7 @@ jobs:
         TRIVY_USERNAME: ${{ github.actor }}
         TRIVY_PASSWORD: ${{ github.token }}
     - name: Send vulnerability records to jira
-      if: ${{ inputs.upload-result }}
+#      if: ${{ inputs.upload-result }}
       run: |
         # get script that sends scan results from Kubeflow CI repo
         #CI_REPO="https://github.com/canonical/kubeflow-ci.git"

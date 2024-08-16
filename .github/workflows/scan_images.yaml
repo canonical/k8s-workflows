@@ -95,4 +95,4 @@ jobs:
         git pull -q origin patch-1
         cd -       
         # send scans from supplied directory
-        ./kubeflow-ci/scripts/cve-reports/send-scan.py --report-path=trivy-results.sarif --jira-url=${{ secrets.JIRA_URL }} 
+        ./kubeflow-ci/scripts/cve-reports/send-scan.py --report-path=trivy-results.sarif --jira-url=${{ secrets.JIRA_URL }} --add-github-meta --verbose 

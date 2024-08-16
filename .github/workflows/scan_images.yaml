@@ -90,9 +90,9 @@ jobs:
         mkdir -p kubeflow-ci
         cd kubeflow-ci
         git init -q
-        git remote add -f origin -b patch-1 "$CI_REPO" &> /dev/null
+        git remote add -f origin "$CI_REPO" &> /dev/null
         git sparse-checkout set scripts/cve-reports/send-scan.py
-        git pull -q origin main
+        git pull -q origin patch-1
         cd -       
         # send scans from supplied directory
         ./kubeflow-ci/scripts/cve-reports/send-scan.py --report-path=trivy-results.sarif --jira-url=${{ secrets.JIRA_URL }} 

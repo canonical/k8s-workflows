@@ -83,16 +83,16 @@ jobs:
         TRIVY_USERNAME: ${{ github.actor }}
         TRIVY_PASSWORD: ${{ github.token }}
     - name: Send vulnerability records to jira
+      if: ${{ inputs.upload-result }}
       run: |
         # get script that sends scan results from Kubeflow CI repo
         #CI_REPO="https://github.com/canonical/kubeflow-ci.git"
-        CI_REPO="https://github.com/maci3jka/kubeflow-ci.git"
         mkdir -p kubeflow-ci
         cd kubeflow-ci
         git init -q
         git remote add -f origin "$CI_REPO" &> /dev/null
         git sparse-checkout set scripts/cve-reports/send-scan.py
-        git pull -q origin patch-1
+        git pull -q origin main
         cd -       
         tail ./kubeflow-ci/scripts/cve-reports/send-scan.py
         # send scans from supplied directory

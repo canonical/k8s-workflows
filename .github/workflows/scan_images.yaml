@@ -86,7 +86,7 @@ jobs:
 #      if: ${{ inputs.upload-result }}
       run: |
         # get script that sends scan results from Kubeflow CI repo
-        #CI_REPO="https://github.com/canonical/kubeflow-ci.git"
+        CI_REPO="https://github.com/canonical/kubeflow-ci.git"
         mkdir -p kubeflow-ci
         cd kubeflow-ci
         git init -q
@@ -94,6 +94,5 @@ jobs:
         git sparse-checkout set scripts/cve-reports/send-scan.py
         git pull -q origin main
         cd -       
-        tail ./kubeflow-ci/scripts/cve-reports/send-scan.py
         # send scans from supplied directory
         ./kubeflow-ci/scripts/cve-reports/send-scan.py --report-path=trivy-results.sarif --jira-url=${{ secrets.JIRA_URL }} --add-github-meta --verbose 

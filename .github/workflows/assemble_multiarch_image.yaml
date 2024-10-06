@@ -84,3 +84,7 @@ jobs:
           const rockMetas = JSON.parse(`${{ steps.assemble-image-tags.outputs.rock-metas }}`)
           ${{ steps.create-and-push-manifest-js.outputs.content }}
           await main(rockMetas, registry, dryRun)
+
+          // Create and push manifests for versions without the -ckN suffix.
+          const metas = JSON.parse(`${{ inputs.rock-metas }}`)
+          await main(metas, registry, dryRun)

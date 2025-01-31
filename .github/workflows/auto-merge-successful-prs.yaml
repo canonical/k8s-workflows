@@ -1,0 +1,55 @@
+name: Auto-merge Successful PRs
+
+on:
+  workflow_call:
+    inputs:
+      approve-msg:
+        description: 'Message to use when approving PRs'
+        type: string
+        required: false
+      dry-run:
+        description: 'Dry run mode'
+        type: boolean
+        required: false
+        default: true
+      bot-authors:
+        description: |
+          Comma-separated list of authors to for auto-merging
+          The labels are not considered if the PR comes from a bot author
+        type: string
+        required: false
+        default: 'app/dependabot,app/renovate'
+      labels:
+        description: |
+          Comma-separated list of labels to require for auto-merging
+        type: string
+        required: false
+        default: 'automerge'
+      min-passing-checks:
+        description: 'Minimum number of checks that must pass to merge'
+        type: number
+        required: true
+      
+permissions:
+  contents: read
+
+env:
+  APPROVE_MSG: ${{ github.event.inputs.approve-msg }}
+  BOT_AUTHORS: ${{ github.event.inputs.bot-authors }}
+  DRY_RUN: ${{ github.event.inputs.dry-run }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  LABELS: ${{ github.event.inputs.labels }}
+  MIN_PASSING_CHECKS: ${{ github.event.inputs.min-passing-checks }}
+
+jobs:
+  merge-successful-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Auto-merge ready pull requests
+        run: |
+            python3 .github/files/auto-merge-successful-pr.py

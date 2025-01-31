@@ -29,27 +29,44 @@ on:
         description: 'Minimum number of checks that must pass to merge'
         type: number
         required: true
+      workflow-ref:
+        description: 'The ref to use for the workflow repo'
+        type: string
+        required: false
+        default: 'main'
       
 permissions:
   contents: read
 
 env:
-  APPROVE_MSG: ${{ github.event.inputs.approve-msg }}
-  BOT_AUTHORS: ${{ github.event.inputs.bot-authors }}
-  DRY_RUN: ${{ github.event.inputs.dry-run }}
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  LABELS: ${{ github.event.inputs.labels }}
-  MIN_PASSING_CHECKS: ${{ github.event.inputs.min-passing-checks }}
+  APPROVE_MSG: ${{ inputs.approve-msg }}
+  BOT_AUTHORS: ${{ inputs.bot-authors }}
+  DRY_RUN: ${{ inputs.dry-run }}
+  GITHUB_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+  LABELS: ${{ inputs.labels }}
+  MIN_PASSING_CHECKS: ${{ inputs.min-passing-checks }}
 
 jobs:
   merge-successful-prs:
     runs-on: ubuntu-latest
     steps:
-      - name: Checking out repo
+      - name: Checking out the caller's repo
         uses: actions/checkout@v4
+        with:
+          path: caller-repo
+
+      - name: Checking out the workflows repo
+        uses: actions/checkout@v4
+        with:
+          repository: canonical/k8s-workflows
+          ref: ${{ inputs.workflow-ref }}
+          path: workflow-repo
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
       - name: Auto-merge ready pull requests
         run: |
-            python3 .github/files/auto-merge-successful-pr.py
+          pushd caller-repo
+          python3 ../workflow-repo/.github/files/auto-merge-successful-pr.py

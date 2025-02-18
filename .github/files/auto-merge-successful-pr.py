@@ -90,7 +90,7 @@ def get_pull_requests() -> Generator[PullRequest, None, None]:
     prs = sorted(json.loads(prs_json), key=lambda pr: pr["number"])
     for pr_dict in prs:
         view_json = sh(
-            f"gh pr view {pr_dict["number"]} --json mergeable,baseRefName,author"
+            f"gh pr view {pr_dict['number']} --json mergeable,baseRefName,author"
         )
         view = json.loads(view_json)
         view["author"] = PullRequestAuthor(**view["author"])
@@ -108,7 +108,8 @@ def match_labels_or_bot(prs) -> Generator[PullRequest, None, None]:
             print(tab("is bot author"))
             yield pr
             continue
-        missing = [req for req in LABELS if not req in pr.labels]
+        pr_labels = [l["name"] for l in pr.labels]
+        missing = [req for req in LABELS if not req in pr_labels]
         if not LABELS or not missing:
             print(tab("matches labels"))
             yield pr

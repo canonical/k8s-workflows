@@ -225,7 +225,7 @@ jobs:
           IMAGE_BUILD_BASE=$(yq '.["build-base"] // .base' "${{ matrix.rock.path }}/rockcraft.yaml")
           IMAGE_REF=${{ matrix.rock.image }}
           INODE_NUM=$(ls -id ${{ matrix.rock.path }} | cut -f 1 -d " ")
-          ROCKCRAFT_CONTAINER_NAME=rockcraft-$IMAGE_NAME-on-$IMAGE_ARCH-for-$IMAGE_ARCH-$INODE_NUM
+          ROCKCRAFT_CONTAINER_NAME=rockcraft-$IMAGE_NAME-$IMAGE_ARCH-for-$IMAGE_ARCH-$INODE_NUM
           echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_ENV
           echo "IMAGE_BASE=$IMAGE_BASE" >> $GITHUB_ENV
           echo "IMAGE_BUILD_BASE=$IMAGE_BUILD_BASE" >> $GITHUB_ENV

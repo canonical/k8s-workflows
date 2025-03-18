@@ -1,0 +1,17 @@
+name: Lint and Test on Pull Request
+
+on:
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: 3.8
+      - run: pip install tox
+      - run: tox -e lint

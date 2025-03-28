@@ -84,9 +84,9 @@ jobs:
         TRIVY_USERNAME: ${{ github.actor }}
         TRIVY_PASSWORD: ${{ github.token }}
     - name: Send vulnerability records to jira
-      env:
-        JIRA_URL: ${{ secrets.JIRA_URL }}
       if: ${{ inputs.upload-result && env.JIRA_URL != '' }}
-      run: |
-        # send scans from supplied directory
-        ./scripts/cve-reports/send-scan.py --report-path=trivy-results.sarif --jira-url=${{ secrets.JIRA_URL }} --add-github-meta
+      uses: ./github/actions/send-cve-reports
+      with:
+          reports: "trivy-results.sarif"
+          jira-url: ${{ secrets.CVE_JIRA_WEBHOOK_URL }}
+          jira-auth-token: ${{ secrets.CVE_JIRA_WEBHOOK_TOKEN }}

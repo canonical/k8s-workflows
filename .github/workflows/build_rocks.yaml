@@ -364,7 +364,7 @@ jobs:
               docker-daemon:temp-rock:latest
 
             echo "FROM temp-rock:latest" > ./Dockerfile.wrapper
-            echo "$dockerfile_wrapper_b64" > base64 -d >> ./Dockerfile.wrapper
+            echo "$dockerfile_wrapper_b64" | base64 -d >> ./Dockerfile.wrapper
             docker build -f ./Dockerfile.wrapper -t rock-patched:latest .
 
             /snap/rockcraft/current/bin/skopeo \

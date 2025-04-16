@@ -374,7 +374,7 @@ jobs:
 
             echo "FROM temp-rock:latest" > ./Dockerfile.wrapper
             echo "$dockerfile_wrapper_b64" | base64 -d >> ./Dockerfile.wrapper
-            docker build -f ./Dockerfile.wrapper -t rock-patched:latest .
+            sudo docker build -f ./Dockerfile.wrapper -t rock-patched:latest .
 
             sudo /snap/rockcraft/current/bin/skopeo \
               --insecure-policy copy \
@@ -382,8 +382,8 @@ jobs:
               docker://$IMAGE_REF \
               --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
 
-            docker image rm temp-rock:latest
-            docker image rm rock-patched
+            sudo docker image rm temp-rock:latest
+            sudo docker image rm rock-patched
           else
             /snap/rockcraft/current/bin/skopeo \
               --insecure-policy copy \

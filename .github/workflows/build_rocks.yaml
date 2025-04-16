@@ -362,7 +362,12 @@ jobs:
           set -x
           dockerfile_wrapper_b64="${{ inputs.dockerfile-wrapper-b64 }}"
           if [[ -n "$dockerfile_wrapper_b64" ]]; then
-            /snap/rockcraft/current/bin/skopeo \
+            if [[ ! `which docker` ]]; then
+              sudo apt-get update
+              sudo apt-get install -y docker.io
+            fi
+
+            sudo /snap/rockcraft/current/bin/skopeo \
               --insecure-policy copy \
               oci-archive:$(ls "${{ matrix.rock.path }}"/*.rock) \
               docker-daemon:temp-rock:latest
@@ -371,7 +376,7 @@ jobs:
             echo "$dockerfile_wrapper_b64" | base64 -d >> ./Dockerfile.wrapper
             docker build -f ./Dockerfile.wrapper -t rock-patched:latest .
 
-            /snap/rockcraft/current/bin/skopeo \
+            sudo /snap/rockcraft/current/bin/skopeo \
               --insecure-policy copy \
               docker-daemon:rock-patched:latest \
               docker://$IMAGE_REF \

@@ -74,10 +74,6 @@ on:
         type: boolean
         description: Start a tmate debug session if the job fails.
         default: false
-      tmate-action:
-        type: string
-        description: The tmate debug action to use in case of failures.
-        default: mxschmitt/action-tmate@v3
     outputs:
       images:
         description: List of images built
@@ -391,5 +387,5 @@ jobs:
               --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"
           fi
       - name: Setup tmate debug session
-        uses: ${{ inputs.tmate-action }}
+        uses: mxschmitt/action-tmate@v3
         if: ${{ failure() && inputs.tmate-on-failure }}

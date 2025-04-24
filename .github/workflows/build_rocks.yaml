@@ -374,7 +374,19 @@ jobs:
 
             echo "FROM temp-rock:latest" > ./Dockerfile.wrapper
             echo "$dockerfile_wrapper_b64" | base64 -d >> ./Dockerfile.wrapper
-            sudo docker build -f ./Dockerfile.wrapper -t rock-patched:latest .
+
+            # Some images require the repository (e.g. ghcr.io/canonical/rawfile-localpv)
+            # and tag to be passed as arguments. The other images will just ignore
+            # those arguments.
+            IMAGE_REPOSITORY=$(echo $IMAGE_REF | cut -d ":" -f 1)
+            IMAGE_TAG=$(echo $IMAGE_REF | cut -d ":" -f 2)
+
+            sudo docker build \
+              -f ./Dockerfile.wrapper \
+              -t rock-patched:latest \
+              --build-arg IMAGE_REPOSITORY="$IMAGE_REPOSITORY" \
+              --build-arg IMAGE_TAG="$IMAGE_TAG" \
+              .
 
             sudo /snap/rockcraft/current/bin/skopeo \
               --insecure-policy copy \

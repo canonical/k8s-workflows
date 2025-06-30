@@ -18,6 +18,17 @@ on:
         type: string
         description: Image runner for building the images
         default: ubuntu-22.04
+      multipass-image:
+        type: string
+        description: |
+          The multipass image to use for building the rock. Only required if enabled-ubuntu-pro-features is set.
+        default: "22.04"
+      enabled-ubuntu-pro-features:
+        type: string
+        description: |
+          Comma separated list of Ubuntu Pro features to enable.
+          Rock will be built in a Ubuntu Pro enabled multipass machine if set.
+        default: ""
       trivy-image-config:
         type: string
         description: Trivy YAML configuration for image testing that is checked in as part of the repo
@@ -62,6 +73,12 @@ on:
           example)
             arch-skipping-maximize-build-space: '["arm64"]'
         default: '[]'
+    secrets:
+      UBUNTU_PRO_TOKEN:
+        required: false
+        description: |
+          Ubuntu Pro token to use for building rocks on Ubuntu Pro
+          This is required if enabled-ubuntu-pro-features is set.
     outputs:
       images:
         description: List of images built
@@ -271,7 +288,7 @@ jobs:
           key: ${{ env.ROCKCRAFT_CACHE_KEY }}
           restore-keys: ${{ env.ROCKCRAFT_CACHE_ALT_KEYS }}
       - name: Setup lxd
-        if: steps.rockcraft-cache.outputs.cache-hit == 'true'
+        if: steps.rockcraft-cache.outputs.cache-hit == 'true' && inputs.enabled-ubuntu-pro-features == ''
         run: |
           sudo groupadd --force --system lxd
           sudo usermod --append --groups lxd $USER
@@ -286,11 +303,47 @@ jobs:
           sudo lxc --project rockcraft import ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar ${{ env.ROCKCRAFT_CONTAINER_NAME }}
           find . -exec touch '{}' ';'
       - name: Build rock
-        if: steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save'
+        if: (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save') && inputs.enabled-ubuntu-pro-features == ''
         uses: canonical/craft-actions/rockcraft-pack@main
         with:
           path: ${{ matrix.rock.path }}
           revision: ${{ matrix.rock.rockcraft-revision }}
+      - name: Setup Multipass
+        if: ${{ inputs.enabled-ubuntu-pro-features != '' }}
+        run: |
+          sudo snap install multipass
+          # The runner is not part of the sudo group, so we need to authenticate the client.
+          # Nesting sudo caused issues with the Multipass client.
+          sudo multipass set local.passphrase=runner
+          # It might take some time to propagate this setting and directly calling multipass authenticate
+          # might fail. So we retry until it works.
+          timeout=30
+          while ! multipass authenticate runner >/dev/null 2>&1; do
+              sleep 1
+              ((timeout--))
+              if [[ $timeout -le 0 ]]; then
+                  echo "Timeout waiting for multipass to authenticate"
+                  exit 1
+              fi
+          done
+          sleep 10
+      - name: Build Rock on Ubuntu Pro
+        if: inputs.enabled-ubuntu-pro-features != ''
+        run: |
+          echo "package_update: true
+          package_upgrade: true
+          packages:
+            - ubuntu-advantage-tools
+          runcmd:
+            - |
+              # We use a staging token here to avoid load on the production contracts service.
+              # echo \"contract_url: https://contracts.staging.canonical.com\" > /etc/ubuntu-advantage/uaclient.conf
+            - pro attach ${{ secrets.UBUNTU_PRO_TOKEN }} --no-auto-enable
+            - reboot" | multipass launch --name rock-builder --cloud-init - --cpus 4 --disk 20GB --memory 8GB ${{ inputs.multipass-image }} || true
+          multipass exec rock-builder -- sudo snap install rockcraft --channel=edge/pro-sources --classic
+          multipass exec rock-builder -- lxd init --auto
+          multipass mount . rock-builder:/home/ubuntu/rock
+          multipass exec rock-builder -d /home/ubuntu/rock/${{ matrix.rock.path }} -- sudo rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
       - name: Generate rockcraft container cache
         if: inputs.cache-action == 'save'
         run: |
@@ -347,4 +400,6 @@ jobs:
       - name: Upload rock to ${{ inputs.registry }}
         if: steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save'
         run: |
+          # Rockcraft is not installed on the host if build with Ubuntu Pro features in Multipass.
+          sudo snap install rockcraft --classic --stable
           /snap/rockcraft/current/bin/skopeo --insecure-policy copy oci-archive:$(ls "${{ matrix.rock.path }}"/*.rock) docker://$IMAGE_REF --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"

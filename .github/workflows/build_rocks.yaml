@@ -28,6 +28,7 @@ on:
         description: |
           Comma separated list of Ubuntu Pro features to enable.
           Rock will be built in a Ubuntu Pro enabled multipass machine if set.
+          ARM64 is not supported and will be built without Pro features in LXD containers.
         default: ""
       trivy-image-config:
         type: string
@@ -288,7 +289,8 @@ jobs:
           key: ${{ env.ROCKCRAFT_CACHE_KEY }}
           restore-keys: ${{ env.ROCKCRAFT_CACHE_ALT_KEYS }}
       - name: Setup lxd
-        if: steps.rockcraft-cache.outputs.cache-hit == 'true' && inputs.enabled-ubuntu-pro-features == ''
+        # Note(ben): arm64 is not supporting nested virtualisation so we just build it with lxd instead of Multipass (and ignore the Ubuntu Pro features).
+        if: steps.rockcraft-cache.outputs.cache-hit == 'true' && (matrix.rock.arch == 'arm64' || inputs.enabled-ubuntu-pro-features == '')
         run: |
           sudo groupadd --force --system lxd
           sudo usermod --append --groups lxd $USER
@@ -303,13 +305,15 @@ jobs:
           sudo lxc --project rockcraft import ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar ${{ env.ROCKCRAFT_CONTAINER_NAME }}
           find . -exec touch '{}' ';'
       - name: Build rock
-        if: (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save') && inputs.enabled-ubuntu-pro-features == ''
+        # Note(ben): arm64 is not supporting nested virtualisation so we just build it with lxd instead of Multipass (and ignore the Ubuntu Pro features).
+        if: (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save') && (matrix.rock.arch == 'arm64' || inputs.enabled-ubuntu-pro-features == '')
         uses: canonical/craft-actions/rockcraft-pack@main
         with:
           path: ${{ matrix.rock.path }}
           revision: ${{ matrix.rock.rockcraft-revision }}
       - name: Setup Multipass
-        if: ${{ inputs.enabled-ubuntu-pro-features != '' }}
+        # Note(ben): arm64 is not supporting nested virtualisation.
+        if: inputs.enabled-ubuntu-pro-features != '' && matrix.rock.arch == 'amd64'
         run: |
           sudo snap install multipass
           # The runner is not part of the sudo group, so we need to authenticate the client.
@@ -319,16 +323,16 @@ jobs:
           # might fail. So we retry until it works.
           timeout=30
           while ! multipass authenticate runner >/dev/null 2>&1; do
-              sleep 1
-              ((timeout--))
-              if [[ $timeout -le 0 ]]; then
-                  echo "Timeout waiting for multipass to authenticate"
-                  exit 1
-              fi
+            sleep 1
+            ((timeout--))
+            if [[ $timeout -le 0 ]]; then
+                echo "Timeout waiting for multipass to authenticate"
+                exit 1
+            fi
           done
           sleep 10
       - name: Build Rock on Ubuntu Pro
-        if: inputs.enabled-ubuntu-pro-features != ''
+        if: inputs.enabled-ubuntu-pro-features != '' && matrix.rock.arch == 'amd64'
         run: |
           echo "package_update: true
           package_upgrade: true

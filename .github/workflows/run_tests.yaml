@@ -27,6 +27,8 @@ jobs:
           pip install tox
       - name: Setup tmate session
         uses: mxschmitt/action-tmate@v3
+        with:
+          detached: true
       - name: Install lxd
         run: |
           sudo snap refresh lxd --channel 5.21/stable

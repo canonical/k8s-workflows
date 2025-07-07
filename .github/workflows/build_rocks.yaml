@@ -330,7 +330,16 @@ jobs:
                 exit 1
             fi
           done
-          sleep 10
+          # Even after the authentatication was successful, multipass still needs some time to initialize.
+          # We try to list the available machines to ensure it is ready.
+          while ! multipass list >/dev/null 2>&1; do
+            sleep 1
+            ((timeout--))
+            if [[ $timeout -le 0 ]]; then
+                echo "Timeout waiting for multipass to authenticate"
+                exit 1
+            fi
+          done
       - name: Build Rock on Ubuntu Pro
         if: inputs.enabled-ubuntu-pro-features != '' && matrix.rock.arch == 'amd64'
         run: |
@@ -404,6 +413,10 @@ jobs:
       - name: Upload rock to ${{ inputs.registry }}
         if: steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save'
         run: |
-          # Rockcraft is not installed on the host if build with Ubuntu Pro features in Multipass.
-          sudo snap install rockcraft --classic --stable
+          ROCKCRAFT_REVISION=$(jq -r ".${{ matrix.rock.arch }}" <<< '${{ inputs.rockcraft-revisions }}')
+          if [ "$ROCKCRAFT_REVISION" == "null" ] || [ -z "$ROCKCRAFT_REVISION" ]; then
+            sudo snap install rockcraft --classic --stable
+          else
+            sudo snap install rockcraft --classic --revision "$ROCKCRAFT_REVISION"
+          fi
           /snap/rockcraft/current/bin/skopeo --insecure-policy copy oci-archive:$(ls "${{ matrix.rock.path }}"/*.rock) docker://$IMAGE_REF --dest-creds "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}"

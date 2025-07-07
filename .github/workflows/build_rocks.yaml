@@ -330,13 +330,16 @@ jobs:
                 exit 1
             fi
           done
-          # Even after the authentatication was successful, multipass still needs some time to initialize.
-          # We try to list the available machines to ensure it is ready.
-          while ! multipass list >/dev/null 2>&1; do
+          # Even after the authentatication was successful, multipass still needs some time to initialize the remotes.
+          # We try to list the available images to ensure it is ready.
+          while ! multipass find >/dev/null 2>&1; do
+            if multipass find release:jammy | grep -q '^release:jammy'; then
+                break
+            fi
             sleep 1
             ((timeout--))
             if [[ $timeout -le 0 ]]; then
-                echo "Timeout waiting for multipass to authenticate"
+                echo "Timeout waiting for release:jammy to be found"
                 exit 1
             fi
           done

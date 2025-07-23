@@ -353,7 +353,7 @@ jobs:
           runcmd:
             - |
               # We use a staging token here to avoid load on the production contracts service.
-              # echo \"contract_url: https://contracts.staging.canonical.com\" > /etc/ubuntu-advantage/uaclient.conf
+              echo \"contract_url: https://contracts.staging.canonical.com\" > /etc/ubuntu-advantage/uaclient.conf
             - pro attach ${{ secrets.UBUNTU_PRO_TOKEN }} --no-auto-enable
             - reboot" | multipass launch --name rock-builder --cloud-init - --cpus 4 --disk 20GB --memory 8GB ${{ inputs.multipass-image }} || true
           multipass exec rock-builder -- sudo snap install rockcraft --channel=edge/pro-sources --classic

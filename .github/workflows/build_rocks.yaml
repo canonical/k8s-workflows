@@ -361,7 +361,8 @@ jobs:
           multipass mount . rock-builder:/home/ubuntu/rock
           multipass exec rock-builder -- lxd init --auto
           multipass exec rock-builder -- sudo lxc project create rockcraft -c features.images=false -c features.profiles=false
-          multipass exec rock-builder -- sudo lxc --project rockcraft import ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar ${{ env.ROCKCRAFT_CONTAINER_NAME }}
+          # Try to import rockcraft container cache but don't fail on it if it is not available.
+          multipass exec rock-builder -- sudo lxc --project rockcraft import ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar ${{ env.ROCKCRAFT_CONTAINER_NAME }} || true
           multipass exec rock-builder -d /home/ubuntu/rock/${{ matrix.rock.path }} -- sudo rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
           multipass exec rock-builder -- sudo mkdir -p /home/ubuntu/.rockcraft-cache
           multipass exec rock-builder -- sudo mkdir -p /home/ubuntu/.rock-cache

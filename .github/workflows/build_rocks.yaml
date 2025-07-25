@@ -359,7 +359,7 @@ jobs:
             - pro attach ${{ secrets.UBUNTU_PRO_TOKEN }} --no-auto-enable
             - reboot" | multipass launch --name rock-builder --cloud-init - --cpus 4 --disk 20GB --memory 8GB ${{ inputs.multipass-image }} || true
 
-          multipass exec rock-builder -- sudo snap install rockcraft --revision=${{ inputs.rockcraft_revision }} --classic
+          multipass exec rock-builder -- sudo snap install rockcraft --revision=${{ matrix.rock.rockcraft-revision }} --classic
           multipass mount ~/.rockcraft-cache rock-builder:/home/ubuntu/.rockcraft-cache
           multipass mount . rock-builder:/home/ubuntu/rock
           multipass exec rock-builder -- lxd init --auto

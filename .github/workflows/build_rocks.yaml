@@ -234,6 +234,8 @@ jobs:
         run: |
           if ! which yq; then sudo snap install yq; fi
           echo "path to yq=$(which yq)"
+          if ! which jq; then sudo snap install jq; fi
+          echo "path to jq=$(which jq)"
 
       - name: Extract rock information
         run: |

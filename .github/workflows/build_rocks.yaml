@@ -234,6 +234,8 @@ jobs:
         run: |
           if ! which yq; then sudo snap install yq; fi
           echo "path to yq=$(which yq)"
+          if ! which jq; then sudo snap install jq; fi
+          echo "path to jq=$(which jq)"
 
       - name: Extract rock information
         run: |
@@ -356,15 +358,19 @@ jobs:
               echo \"contract_url: https://contracts.staging.canonical.com\" > /etc/ubuntu-advantage/uaclient.conf
             - pro attach ${{ secrets.UBUNTU_PRO_TOKEN }} --no-auto-enable
             - reboot" | multipass launch --name rock-builder --cloud-init - --cpus 4 --disk 20GB --memory 8GB ${{ inputs.multipass-image }} || true
-          multipass exec rock-builder -- sudo snap install rockcraft --channel=edge/pro-sources --classic
-          multipass exec rock-builder -- lxd init --auto
+
+          multipass exec rock-builder -- sudo snap install rockcraft --revision=${{ matrix.rock.rockcraft-revision }} --classic
           multipass mount ~/.rockcraft-cache rock-builder:/home/ubuntu/.rockcraft-cache
           multipass mount . rock-builder:/home/ubuntu/rock
+          multipass exec rock-builder -- lxd init --auto
+          multipass exec rock-builder -- sudo lxc project create rockcraft -c features.images=false -c features.profiles=false
+          # Try to import rockcraft container cache but don't fail on it if it is not available.
+          multipass exec rock-builder -- sudo lxc --project rockcraft import ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar ${{ env.ROCKCRAFT_CONTAINER_NAME }} || true
           multipass exec rock-builder -d /home/ubuntu/rock/${{ matrix.rock.path }} -- sudo rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
           multipass exec rock-builder -- sudo mkdir -p /home/ubuntu/.rockcraft-cache
           multipass exec rock-builder -- sudo mkdir -p /home/ubuntu/.rock-cache
           multipass exec rock-builder -- sudo touch /home/ubuntu/.rock-cache/.gitkeep
-          multipass exec rock-builder -- sudo lxc --project rockcraft export ${{ env.ROCKCRAFT_CONTAINER_NAME }} --compression none ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar
+          multipass exec rock-builder -- sudo lxc --project rockcraft export ${{ env.ROCKCRAFT_CONTAINER_NAME }} --compression none ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar || true
       - name: Generate rockcraft container cache
         if: inputs.cache-action == 'save' && (matrix.rock.arch == 'arm64' || inputs.enabled-ubuntu-pro-features == '')
         run: |

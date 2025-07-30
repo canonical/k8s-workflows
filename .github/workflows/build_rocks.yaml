@@ -13,6 +13,10 @@ on:
           be available, defaults to /var/snap/lxd/common/lxd/storage-pools
           if unset.
         default: /var/snap/lxd/common/lxd/storage-pools
+      multipass-builder-storage:
+        type: string
+        description: Allocated disk size for the Multipass VM.
+        default: 20GB
       owner:
         type: string
         description: Registry owner to push the built images
@@ -362,7 +366,7 @@ jobs:
               # We use a staging token here to avoid load on the production contracts service.
               echo \"contract_url: https://contracts.staging.canonical.com\" > /etc/ubuntu-advantage/uaclient.conf
             - pro attach ${{ secrets.UBUNTU_PRO_TOKEN }} --no-auto-enable
-            - reboot" | multipass launch --name rock-builder --cloud-init - --cpus 4 --disk 20GB --memory 8GB ${{ inputs.multipass-image }} || true
+            - reboot" | multipass launch --name rock-builder --cloud-init - --cpus 4 --disk ${{ inputs.multipass-builder-storage }} --memory 16GB ${{ inputs.multipass-image }} || true
           multipass exec rock-builder -- sudo snap install rockcraft --channel=edge/pro-sources --classic
           multipass exec rock-builder -- lxd init --auto
           multipass mount ~/.rockcraft-cache rock-builder:/home/ubuntu/.rockcraft-cache

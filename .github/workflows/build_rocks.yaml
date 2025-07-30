@@ -6,6 +6,13 @@ name: Build images
 on:
   workflow_call:
     inputs:
+      build-mount-path:
+        type: string
+        description: |
+          Absolute path to the mount point where the build space will
+          be available, defaults to /var/snap/lxd/common/lxd/storage-pools
+          if unset.
+        default: /var/snap/lxd/common/lxd/storage-pools
       owner:
         type: string
         description: Registry owner to push the built images
@@ -212,9 +219,9 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Ensure LXD storage pools path
+      - name: Ensure build mount path
         run: |
-          sudo mkdir -p /var/snap/lxd/common/lxd/storage-pools
+          sudo mkdir -p ${{ inputs.build-mount-path }}
       - name: Maximize build space
         if: ${{ !contains(fromJson(inputs.arch-skipping-maximize-build-space), matrix.rock.arch) }}
         uses: easimon/maximize-build-space@v10
@@ -225,7 +232,7 @@ jobs:
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
-          build-mount-path: "/var/snap/lxd/common/lxd/storage-pools"
+          build-mount-path: ${{ inputs.build-mount-path }}
           build-mount-path-ownership: "root:root"
       - uses: actions/checkout@v4.1.1
         with:

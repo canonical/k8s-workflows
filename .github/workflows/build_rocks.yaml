@@ -358,7 +358,14 @@ jobs:
               echo \"contract_url: https://contracts.staging.canonical.com\" > /etc/ubuntu-advantage/uaclient.conf
             - pro attach ${{ secrets.UBUNTU_PRO_TOKEN }} --no-auto-enable
             - reboot" | multipass launch --name rock-builder --cloud-init - --cpus 4 --disk 20GB --memory 8GB ${{ inputs.multipass-image }} || true
-
+          # Make sure the cloud-init setup is done before proceeding.
+          for i in {1..200}; do
+            status=$(multipass exec rock-builder -- bash -c 'cloud-init status --format json' 2>/dev/null | jq -r .status)
+            if [ "$status" = "done" ]; then
+                break
+            fi
+            sleep 10
+          done
           multipass exec rock-builder -- sudo snap install rockcraft --revision=${{ matrix.rock.rockcraft-revision }} --classic
           mkdir -p ~/.rockcraft-cache
           mkdir -p ~/.rock-cache

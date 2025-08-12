@@ -3,7 +3,7 @@ async function get_by_assoc(assoc, package_name, type, method) {
     try {
         core.info(`Looking up existing containers by ${type} ${assoc}/${package_name}`)
         containers = await github.paginate(method, {
-            [type]: assoc, 
+            [type]: assoc,
             package_type: "container",
             package_name
         });
@@ -32,8 +32,11 @@ async function main(rockMetas){
                     partial + v.metadata.container.tags.filter(t => t.startsWith(rockVersion_)).length, 0
                 )
                 core.info(`Number of containers tagged ${owner}/${meta.name}/${rockVersion_}: ${patchRev}`)
-                core.info(`Tagging image ${meta.image} with ${meta.version}`)
                 meta.version = rockVersion_ + patchRev
+                if (versions.flatMap(v => v.metadata.container.tags).includes(meta.version)) {
+                    throw new Error(`Container ${owner}/${meta.name} is already tagged ${meta.version}`)
+                }
+                core.info(`Tagging image ${meta.image} with ${meta.version}`)
                 return meta
             }
         ))

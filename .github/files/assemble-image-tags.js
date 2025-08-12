@@ -2,19 +2,23 @@ async function get_by_assoc(assoc, package_name, type, method) {
     let containers
     try {
         core.info(`Looking up existing containers by ${type} ${assoc}/${package_name}`)
-        containers = (await method({[type]: assoc, package_type: "container", package_name})).data;
+        containers = await github.paginate(method, {
+            [type]: assoc, 
+            package_type: "container",
+            package_name
+        });
         core.info(`Found by ${assoc}`)
     } catch (e) {
         containers = [];
         console.error(e);
     }
-    return containers
+    return containers;
 }
 
 async function get_containers(assoc, package_name) {
     let by_org = await get_by_assoc(assoc, package_name, "org", github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg)
     let by_user = await get_by_assoc(assoc, package_name, "username", github.rest.packages.getAllPackageVersionsForPackageOwnedByUser)
-    return by_org.length ? by_org : by_user
+    return by_org.length ? by_org : by_user;
 }
 
 async function main(rockMetas){

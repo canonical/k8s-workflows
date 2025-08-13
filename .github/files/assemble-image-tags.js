@@ -33,7 +33,7 @@ async function main(rockMetas){
                 )
                 core.info(`Number of containers tagged ${owner}/${meta.name}/${rockVersion_}: ${patchRev}`)
                 meta.version = rockVersion_ + patchRev
-                if (versions.flatMap(v => v.metadata.container.tags).includes(meta.version)) {
+                if (versions.some(v => v.metadata?.container?.tags?.includes(meta.version))) {
                     throw new Error(`Container ${owner}/${meta.name} is already tagged ${meta.version}`)
                 }
                 core.info(`Tagging image ${meta.image} with ${meta.version}`)

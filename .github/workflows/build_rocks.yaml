@@ -358,15 +358,10 @@ jobs:
             - reboot" | multipass launch --name rock-builder --cloud-init - --cpus 4 --disk 20GB --memory 8GB ${{ inputs.multipass-image }} || true
           multipass exec rock-builder -- sudo snap install rockcraft --channel=edge/pro-sources --classic
           multipass exec rock-builder -- lxd init --auto
-          multipass mount ~/.rockcraft-cache rock-builder:/home/ubuntu/.rockcraft-cache
           multipass mount . rock-builder:/home/ubuntu/rock
           multipass exec rock-builder -d /home/ubuntu/rock/${{ matrix.rock.path }} -- sudo rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
-          multipass exec rock-builder -- sudo mkdir -p /home/ubuntu/.rockcraft-cache
-          multipass exec rock-builder -- sudo mkdir -p /home/ubuntu/.rock-cache
-          multipass exec rock-builder -- sudo touch /home/ubuntu/.rock-cache/.gitkeep
-          multipass exec rock-builder -- sudo lxc --project rockcraft export ${{ env.ROCKCRAFT_CONTAINER_NAME }} --compression none ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar
       - name: Generate rockcraft container cache
-        if: inputs.cache-action == 'save' && (matrix.rock.arch == 'arm64' || inputs.enabled-ubuntu-pro-features == '')
+        if: inputs.cache-action == 'save'
         run: |
           mkdir -p ~/.rockcraft-cache
           mkdir -p ~/.rock-cache

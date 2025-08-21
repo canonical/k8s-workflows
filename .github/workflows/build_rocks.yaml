@@ -40,6 +40,11 @@ on:
           The key should be one of the platforms in rockcraft.yaml (amd64, arm64...)
           the values should be a list of labels to use in the runs-on field of a gh action
         default: '{}'
+      enabled-ubuntu-pro-features:
+        type: string
+        description: |
+          Comma separated list of Ubuntu Pro features to enable.
+        default: ""
       rockcraft-revisions:
         type: string
         description: |-
@@ -62,6 +67,12 @@ on:
           example)
             arch-skipping-maximize-build-space: '["arm64"]'
         default: '[]'
+    secrets:
+      UBUNTU_PRO_TOKEN:
+        required: false
+        description: |
+          Ubuntu Pro token to use for building rocks on Ubuntu Pro
+          This is required if enabled-ubuntu-pro-features is set.
     outputs:
       images:
         description: List of images built
@@ -194,6 +205,13 @@ jobs:
       contents: read
       packages: write
     steps:
+      - name: Enable Ubuntu Pro
+        if: inputs.enabled-ubuntu-pro-features != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ubuntu-advantage-tools
+          sudo sh -c 'echo "contract_url: https://contracts.staging.canonical.com" > /etc/ubuntu-advantage/uaclient.conf'
+          sudo pro attach ${{ secrets.UBUNTU_PRO_TOKEN }} --no-auto-enable
       - name: Ensure LXD storage pools path
         run: |
           sudo mkdir -p /var/snap/lxd/common/lxd/storage-pools
@@ -270,14 +288,8 @@ jobs:
           path: ~/.rockcraft-cache/
           key: ${{ env.ROCKCRAFT_CACHE_KEY }}
           restore-keys: ${{ env.ROCKCRAFT_CACHE_ALT_KEYS }}
-      - name: Setup lxd
-        if: steps.rockcraft-cache.outputs.cache-hit == 'true'
-        run: |
-          sudo groupadd --force --system lxd
-          sudo usermod --append --groups lxd $USER
-          sudo snap refresh lxd --channel latest/stable
-          sudo lxd init --auto
-          sudo iptables -P FORWARD ACCEPT
+      - name: Setup LXD
+        uses: canonical/setup-lxd@v0.1.3
       - name: Import rockcraft container cache
         if: steps.rockcraft-cache.outputs.cache-hit == 'true'
         working-directory: ${{ inputs.working-directory }}
@@ -285,12 +297,24 @@ jobs:
           sudo lxc project create rockcraft -c features.images=false -c features.profiles=false
           sudo lxc --project rockcraft import ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar ${{ env.ROCKCRAFT_CONTAINER_NAME }}
           find . -exec touch '{}' ';'
+      - name: Setup rockcraft with specific revision
+        if: matrix.rock.rockcraft-revision != ''
+        run: |
+          sudo snap install rockcraft --classic --revision ${{ matrix.rock.rockcraft-revision }}
+      - name: Setup rockcraft stable
+        if: matrix.rock.rockcraft-revision == ''
+        run: |
+          sudo snap install rockcraft --classic --stable
+      - name: Build rock with Pro features
+        if: inputs.enabled-ubuntu-pro-features != '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
+        working-directory: ${{ matrix.rock.path }}
+        run: |
+          sudo rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
       - name: Build rock
-        if: steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save'
-        uses: canonical/craft-actions/rockcraft-pack@main
-        with:
-          path: ${{ matrix.rock.path }}
-          revision: ${{ matrix.rock.rockcraft-revision }}
+        if: inputs.enabled-ubuntu-pro-features == '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
+        working-directory: ${{ matrix.rock.path }}
+        run: |
+          sudo rockcraft pack
       - name: Generate rockcraft container cache
         if: inputs.cache-action == 'save'
         run: |

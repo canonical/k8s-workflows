@@ -6,13 +6,6 @@ name: Build images
 on:
   workflow_call:
     inputs:
-      build-mount-path:
-        type: string
-        description: |
-          Absolute path to the mount point where the build space will
-          be available, defaults to /var/snap/lxd/common/lxd/storage-pools
-          if unset.
-        default: /var/snap/lxd/common/lxd/storage-pools
       owner:
         type: string
         description: Registry owner to push the built images
@@ -25,18 +18,6 @@ on:
         type: string
         description: Image runner for building the images
         default: ubuntu-22.04
-      multipass-cpus:
-        type: number
-        description: Number of CPUs for the Multipass VM
-        default: 4
-      multipass-disk:
-        type: string
-        description: Disk size for the Multipass VM (e.g., 20GB)
-        default: 20GB
-      multipass-memory:
-        type: string
-        description: Memory size for the Multipass VM (e.g., 8GB)
-        default: 8GB
       multipass-image:
         type: string
         description: |
@@ -231,9 +212,9 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Ensure build mount path
+      - name: Ensure LXD storage pools path
         run: |
-          sudo mkdir -p ${{ inputs.build-mount-path }}
+          sudo mkdir -p /var/snap/lxd/common/lxd/storage-pools
       - name: Maximize build space
         if: ${{ !contains(fromJson(inputs.arch-skipping-maximize-build-space), matrix.rock.arch) }}
         uses: easimon/maximize-build-space@v10
@@ -244,7 +225,7 @@ jobs:
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
-          build-mount-path: ${{ inputs.build-mount-path }}
+          build-mount-path: "/var/snap/lxd/common/lxd/storage-pools"
           build-mount-path-ownership: "root:root"
       - uses: actions/checkout@v4.1.1
         with:
@@ -376,7 +357,7 @@ jobs:
               # We use a staging token here to avoid load on the production contracts service.
               echo \"contract_url: https://contracts.staging.canonical.com\" > /etc/ubuntu-advantage/uaclient.conf
             - pro attach ${{ secrets.UBUNTU_PRO_TOKEN }} --no-auto-enable
-            - reboot" | multipass launch --name rock-builder --cloud-init - --cpus ${{ inputs.multipass-cpus }} --disk ${{ inputs.multipass-disk }} --memory ${{ inputs.multipass-memory }} ${{ inputs.multipass-image }} || true
+            - reboot" | multipass launch --name rock-builder --cloud-init - --cpus 4 --disk 20GB --memory 8GB ${{ inputs.multipass-image }} || true
           # Make sure the cloud-init setup is done before proceeding.
           for i in {1..200}; do
             status=$(multipass exec rock-builder -- bash -c 'cloud-init status --format json' 2>/dev/null | jq -r .status)

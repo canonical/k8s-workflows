@@ -61,3 +61,9 @@ jobs:
           export TEST_SUBSTRATE=lxd
           export TEST_LXD_IMAGE="ubuntu:22.04"
           sg lxd -c 'tox --conf tests/tox.ini -e integration'
+      - name: Setup tmate session
+        uses: canonical/action-tmate@main
+        if: failure()
+        with:
+          detached: true
+

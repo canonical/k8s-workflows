@@ -309,7 +309,7 @@ jobs:
         if: inputs.enabled-ubuntu-pro-features != '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
         working-directory: ${{ matrix.rock.path }}
         run: |
-          sudo rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
+          sudo rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }} --verbose
       - name: Build rock
         if: inputs.enabled-ubuntu-pro-features == '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
         working-directory: ${{ matrix.rock.path }}

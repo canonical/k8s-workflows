@@ -188,14 +188,14 @@ jobs:
                 rockPaths.push(rockPath)
             }
 
-            echo "Rock Metas: "
-            echo rockMetas
-            echo "Changed Rock Metas: "
-            echo changedMetas
-            echo "Rock Paths: "
-            echo rockPaths
-            echo "Images: "
-            echo images
+            core.info("Rock Metas: ")
+            core.info(JSON.stringify(rockMetas, null, 2))
+            core.info("Changed Rock Metas: ")
+            core.info(JSON.stringify(changedMetas, null, 2))
+            core.info("Rock Paths: ")
+            core.info(JSON.stringify(rockPaths, null, 2))
+            core.info("Images: ")
+            core.info(JSON.stringify(images, null, 2))
 
             core.setOutput('rock-metas', JSON.stringify(rockMetas))
             core.setOutput('changed-rock-metas', JSON.stringify(changedMetas))

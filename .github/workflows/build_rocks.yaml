@@ -187,6 +187,16 @@ jobs:
                 }
                 rockPaths.push(rockPath)
             }
+
+            echo "Rock Metas: "
+            echo ${{ toJson(rockMetas) }}
+            echo "Changed Rock Metas: "
+            echo ${{ toJson(changedMetas) }}
+            echo "Rock Paths: "
+            echo ${{ toJson(rockPaths) }}
+            echo "Images: "
+            echo ${{ toJson(images) }}
+
             core.setOutput('rock-metas', JSON.stringify(rockMetas))
             core.setOutput('changed-rock-metas', JSON.stringify(changedMetas))
             core.setOutput('rock-paths', JSON.stringify(rockPaths))

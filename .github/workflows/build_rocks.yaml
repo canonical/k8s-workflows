@@ -189,13 +189,13 @@ jobs:
             }
 
             echo "Rock Metas: "
-            echo ${{ toJson(rockMetas) }}
+            echo rockMetas
             echo "Changed Rock Metas: "
-            echo ${{ toJson(changedMetas) }}
+            echo changedMetas
             echo "Rock Paths: "
-            echo ${{ toJson(rockPaths) }}
+            echo rockPaths
             echo "Images: "
-            echo ${{ toJson(images) }}
+            echo images
 
             core.setOutput('rock-metas', JSON.stringify(rockMetas))
             core.setOutput('changed-rock-metas', JSON.stringify(changedMetas))

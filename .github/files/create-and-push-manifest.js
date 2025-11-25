@@ -1,12 +1,32 @@
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function retry(fn, maxAttempts = 3, delayMs = 1000) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            if (attempt === maxAttempts) {
+                throw error; // Final attempt failed, crash the step
+            }
+            core.warning(`Attempt ${attempt} failed. Retrying in ${delayMs} ms... Error: ${error.message}`);
+            await sleep(delayMs);
+        }
+    }
+}
 class RockImage {
-    constructor (image, arch) {
+    constructor(image, arch) {
         this.image = image
         this.arch = arch
     }
-   
+
     async import_image() {
         console.info(`    ⏬ pull image: ${this.image}`)
-        await exec.exec("docker", ["pull", this.image])
+        await retry(async () => await exec.exec("docker", ["pull", this.image]))
+    }
+
+    async remove_image() {
+        console.info(`    ✂️ remove image: ${this.image}`)
+        await exec.exec("docker", ["rmi", this.image])
     }
 
     async annotate(target) {
@@ -16,7 +36,7 @@ class RockImage {
 }
 
 class RockComponent {
-    constructor (name, version, dryRun) {
+    constructor(name, version, dryRun) {
         this.name = name
         this.version = version
         this.dryRun = dryRun
@@ -34,8 +54,8 @@ class RockComponent {
     async push_manifest(target) {
         console.info(`  ⏫ push manifest: ${target}`)
         console.info(`docker manifest push ${target}`)
-        if (this.dryRun != true ){
-            await exec.exec("docker", ["manifest", "push", target])
+        if (this.dryRun != true) {
+            await retry(async () => await exec.exec("docker", ["manifest", "push", target]))
         } else {
             console.info(`Not pushing manifest ${target} -- because dryRun: ${this.dryRun}`)
         }
@@ -46,13 +66,16 @@ class RockComponent {
             await image.import_image()
         }
         const targetImage = `${target.trim('/')}/${this.imageVer}`
-        await exec.exec("docker", ["manifest", "rm", targetImage], {ignoreReturnCode: true})
+        await exec.exec("docker", ["manifest", "rm", targetImage], { ignoreReturnCode: true })
         await this.create_manifest(targetImage)
 
         for (const image of this.images) {
             await image.annotate(targetImage)
         }
         await this.push_manifest(targetImage)
+        for (const image of this.images) {
+            await image.remove_image()
+        }
     }
 }
 

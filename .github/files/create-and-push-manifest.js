@@ -21,12 +21,12 @@ class RockImage {
 
     async import_image() {
         console.info(`    ⏬ pull image: ${this.image}`)
-        await retry(async () => await exec.exec("docker", ["pull", this.image]))
+        await retry(() => exec.exec("docker", ["pull", this.image]))
     }
 
     async remove_image() {
         console.info(`    ✂️ remove image: ${this.image}`)
-        await exec.exec("docker", ["rmi", this.image])
+        await exec.exec("docker", ["rmi", this.image], { ignoreReturnCode: true })
     }
 
     async annotate(target) {
@@ -55,10 +55,15 @@ class RockComponent {
         console.info(`  ⏫ push manifest: ${target}`)
         console.info(`docker manifest push ${target}`)
         if (this.dryRun != true) {
-            await retry(async () => await exec.exec("docker", ["manifest", "push", target]))
+            await retry(() => exec.exec("docker", ["manifest", "push", target]))
         } else {
             console.info(`Not pushing manifest ${target} -- because dryRun: ${this.dryRun}`)
         }
+    }
+
+    async clean_manifest(target) {
+        console.info(`  🧼 clean manifest: ${target}`)
+        await exec.exec("docker", ["manifest", "rm", target], { ignoreReturnCode: true })
     }
 
     async craft_manifest(target) {
@@ -73,6 +78,8 @@ class RockComponent {
             await image.annotate(targetImage)
         }
         await this.push_manifest(targetImage)
+
+        await this.clean_manifest(targetImage)
         for (const image of this.images) {
             await image.remove_image()
         }

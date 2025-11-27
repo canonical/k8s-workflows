@@ -67,6 +67,15 @@ on:
           example)
             arch-skipping-maximize-build-space: '["arm64"]'
         default: '[]'
+      build-env:
+        type: string
+        description: |-
+          JSON mapping of environment variables to set during the build process.
+          Useful for configuring build tools like Go proxy settings.
+          
+          example)
+            build-env: '{"GOPROXY": "https://proxy.golang.org,direct", "GOSUMDB": "sum.golang.org"}'
+        default: '{}'
     secrets:
       UBUNTU_PRO_TOKEN:
         required: false
@@ -308,13 +317,15 @@ jobs:
       - name: Build rock with Pro features
         if: inputs.enabled-ubuntu-pro-features != '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
         working-directory: ${{ matrix.rock.path }}
+        env: ${{ fromJSON(inputs.build-env) }}
         run: |
-          sudo rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
+          sudo -E rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
       - name: Build rock
         if: inputs.enabled-ubuntu-pro-features == '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
         working-directory: ${{ matrix.rock.path }}
+        env: ${{ fromJSON(inputs.build-env) }}
         run: |
-          sudo rockcraft pack
+          sudo -E rockcraft pack
       - name: Generate rockcraft container cache
         if: inputs.cache-action == 'save'
         run: |

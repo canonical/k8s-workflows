@@ -319,12 +319,14 @@ jobs:
         working-directory: ${{ matrix.rock.path }}
         env: ${{ fromJSON(inputs.build-env) }}
         run: |
+          export GOPROXY=direct
           sudo -E rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
       - name: Build rock
         if: inputs.enabled-ubuntu-pro-features == '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
         working-directory: ${{ matrix.rock.path }}
         env: ${{ fromJSON(inputs.build-env) }}
         run: |
+          export GOPROXY=direct
           sudo -E rockcraft pack
       - name: Generate rockcraft container cache
         if: inputs.cache-action == 'save'

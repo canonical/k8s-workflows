@@ -1,40 +1,5 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
-
-# Build Rocks Workflow
-#
-# This reusable workflow builds OCI images (Rocks) using Rockcraft.
-#
-# Go Caching:
-#   This workflow includes Go module and build caching to improve build reliability
-#   and reduce network requests, especially on self-hosted runners.
-#
-#   Cache Behavior:
-#   - Go module cache: Stores downloaded Go dependencies (~/.go-mod-cache)
-#   - Go build cache: Stores compiled Go packages (~/.go-build-cache)
-#   - Caches are isolated per Rock (by name and path) and per architecture
-#   - Cache keys include go.mod and go.sum hashes for automatic invalidation
-#
-#   Cache Key Structure:
-#   - {rock-path}/go-mod-cache?name={rock-name}&gomod={hash}&gosum={hash}&arch={arch}&date={YYYY-MM-DD}
-#   - {rock-path}/go-build-cache?name={rock-name}&gomod={hash}&gosum={hash}&arch={arch}&date={YYYY-MM-DD}
-#
-#   Parallel Builds:
-#   - For parallel builds (e.g., PR builds), use cache-action: restore
-#   - This allows all jobs to read from cache without conflicts
-#   - For sequential builds (e.g., main branch), use cache-action: save
-#   - This updates caches with newly downloaded dependencies
-#
-#   Cache Size Considerations:
-#   - GitHub Actions has a 10GB cache limit per repository
-#   - Go module caches are typically 100-500MB per Rock
-#   - Go build caches are typically 50-200MB per Rock
-#   - Caches are automatically evicted after 7 days of no access
-#
-#   Disabling Go Caching:
-#   - Set enable-go-caching: false to disable Go caching
-#   - Set cache-action: skip to disable all caching (rockcraft + Go)
-
 name: Build images
 
 on:
@@ -496,7 +461,27 @@ jobs:
           else
             export GOPROXY=direct
           fi
-          sudo -E rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
+          
+          # Retry logic for EOF and network errors
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Build attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
+            if sudo -E rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}; then
+              echo "✓ Build succeeded"
+              break
+            else
+              EXIT_CODE=$?
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⚠ Build failed with exit code $EXIT_CODE, retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "✗ Build failed after $MAX_RETRIES attempts"
+                exit $EXIT_CODE
+              fi
+            fi
+          done
       - name: Build rock
         if: inputs.enabled-ubuntu-pro-features == '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
         working-directory: ${{ matrix.rock.path }}
@@ -515,7 +500,27 @@ jobs:
           else
             export GOPROXY=direct
           fi
-          sudo -E rockcraft pack
+          
+          # Retry logic for EOF and network errors
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Build attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
+            if sudo -E rockcraft pack; then
+              echo "✓ Build succeeded"
+              break
+            else
+              EXIT_CODE=$?
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⚠ Build failed with exit code $EXIT_CODE, retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "✗ Build failed after $MAX_RETRIES attempts"
+                exit $EXIT_CODE
+              fi
+            fi
+          done
       - name: Generate rockcraft container cache
         if: inputs.cache-action == 'save'
         run: |

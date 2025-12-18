@@ -353,7 +353,7 @@ jobs:
           key: ${{ env.ROCKCRAFT_CACHE_KEY }}
           restore-keys: ${{ env.ROCKCRAFT_CACHE_ALT_KEYS }}
       - name: Restore Go module cache
-        if: inputs.enable-go-caching == true && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
         uses: actions/cache/restore@v4.2.0
         id: go-mod-cache
         continue-on-error: true
@@ -362,7 +362,7 @@ jobs:
           key: ${{ env.GO_MOD_CACHE_KEY }}
           restore-keys: ${{ env.GO_MOD_CACHE_ALT_KEYS }}
       - name: Log Go module cache status
-        if: inputs.enable-go-caching == true && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
         run: |
           if [ "${{ steps.go-mod-cache.outputs.cache-hit }}" == "true" ]; then
             echo "✓ Go module cache hit for key: ${{ env.GO_MOD_CACHE_KEY }}"
@@ -371,7 +371,7 @@ jobs:
             echo "  Will download dependencies from Go proxy during build"
           fi
       - name: Restore Go build cache
-        if: inputs.enable-go-caching == true && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
         uses: actions/cache/restore@v4.2.0
         id: go-build-cache
         continue-on-error: true
@@ -380,7 +380,7 @@ jobs:
           key: ${{ env.GO_BUILD_CACHE_KEY }}
           restore-keys: ${{ env.GO_BUILD_CACHE_ALT_KEYS }}
       - name: Log Go build cache status
-        if: inputs.enable-go-caching == true && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
         run: |
           if [ "${{ steps.go-build-cache.outputs.cache-hit }}" == "true" ]; then
             echo "✓ Go build cache hit for key: ${{ env.GO_BUILD_CACHE_KEY }}"
@@ -406,7 +406,7 @@ jobs:
         run: |
           sudo snap install rockcraft --classic --stable
       - name: Create Go cache directories
-        if: inputs.enable-go-caching == true
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true'
         run: |
           mkdir -p ~/.go-mod-cache/${{ env.IMAGE_NAME }}
           mkdir -p ~/.go-build-cache/${{ env.IMAGE_NAME }}
@@ -414,7 +414,7 @@ jobs:
           echo "  Module cache: ~/.go-mod-cache/${{ env.IMAGE_NAME }}"
           echo "  Build cache: ~/.go-build-cache/${{ env.IMAGE_NAME }}"
       - name: Mount Go caches into LXD container
-        if: inputs.enable-go-caching == true && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
         continue-on-error: true
         run: |
           # Wait for container to be ready (it may be starting from cache import)
@@ -449,7 +449,7 @@ jobs:
         env: ${{ fromJSON(inputs.build-env) }}
         run: |
           # Configure Go environment variables
-          if [ "${{ inputs.enable-go-caching }}" == "true" ]; then
+          if [ "${{ inputs.enable-go-caching }}" == "true" ] && [ "${{ env.GO_DETECTED }}" == "true" ]; then
             export GOMODCACHE=/root/go/pkg/mod
             export GOCACHE=/root/.cache/go-build
             export GOPROXY=https://proxy.golang.org,direct
@@ -488,7 +488,7 @@ jobs:
         env: ${{ fromJSON(inputs.build-env) }}
         run: |
           # Configure Go environment variables
-          if [ "${{ inputs.enable-go-caching }}" == "true" ]; then
+          if [ "${{ inputs.enable-go-caching }}" == "true" ] && [ "${{ env.GO_DETECTED }}" == "true" ]; then
             export GOMODCACHE=/root/go/pkg/mod
             export GOCACHE=/root/.cache/go-build
             export GOPROXY=https://proxy.golang.org,direct
@@ -575,7 +575,7 @@ jobs:
           path: ~/.rock-cache
           key: ${{ env.ROCK_CACHE_KEY }}
       - name: Delete Go module cache
-        if: inputs.enable-go-caching == true && inputs.cache-action == 'save'
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -594,18 +594,18 @@ jobs:
               /repos/${{ github.repository }}/actions/caches?key=$(printf %s "$key"|jq -sRr @uri) || :
           done
       - name: Save Go module cache
-        if: inputs.enable-go-caching == true && inputs.cache-action == 'save'
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
         uses: actions/cache/save@v4.2.0
         continue-on-error: true
         with:
           path: ~/.go-mod-cache/${{ env.IMAGE_NAME }}/
           key: ${{ env.GO_MOD_CACHE_KEY }}
       - name: Log Go module cache save
-        if: inputs.enable-go-caching == true && inputs.cache-action == 'save'
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
         run: |
           echo "✓ Saved Go module cache with key: ${{ env.GO_MOD_CACHE_KEY }}"
       - name: Delete Go build cache
-        if: inputs.enable-go-caching == true && inputs.cache-action == 'save'
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -624,14 +624,14 @@ jobs:
               /repos/${{ github.repository }}/actions/caches?key=$(printf %s "$key"|jq -sRr @uri) || :
           done
       - name: Save Go build cache
-        if: inputs.enable-go-caching == true && inputs.cache-action == 'save'
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
         uses: actions/cache/save@v4.2.0
         continue-on-error: true
         with:
           path: ~/.go-build-cache/${{ env.IMAGE_NAME }}/
           key: ${{ env.GO_BUILD_CACHE_KEY }}
       - name: Log Go build cache save
-        if: inputs.enable-go-caching == true && inputs.cache-action == 'save'
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
         run: |
           echo "✓ Saved Go build cache with key: ${{ env.GO_BUILD_CACHE_KEY }}"
       - name: Upload rock to ${{ inputs.registry }}

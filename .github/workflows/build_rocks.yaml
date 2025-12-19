@@ -265,6 +265,11 @@ jobs:
           echo "IMAGE_REF=$IMAGE_REF" >> $GITHUB_ENV
           echo "IMAGE_ARCH=$IMAGE_ARCH" >> $GITHUB_ENV
           echo "ROCKCRAFT_CONTAINER_NAME=$ROCKCRAFT_CONTAINER_NAME" >> $GITHUB_ENV
+      - name: Compute stable cache date
+        run: |
+          # Use a single, stable UTC date across all cache keys
+          TODAY=$(date -u +%Y-%m-%d)
+          echo "TODAY=$TODAY" >> $GITHUB_ENV
       - name: Generate rockcraft cache key
         run: |
           ROCKCRAFT_PATH="${{ matrix.rock.path }}"
@@ -275,16 +280,16 @@ jobs:
             ROCKCRAFT_CACHE_KEY_BASE="${ROCKCRAFT_CACHE_KEY_BASE}&arch=${{ env.IMAGE_ARCH }}"
             ROCK_CACHE_KEY_BASE="${ROCK_CACHE_KEY_BASE}&arch=${{ env.IMAGE_ARCH }}"
           fi
-          echo "ROCKCRAFT_CACHE_KEY=$ROCKCRAFT_CACHE_KEY_BASE&date=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+          echo "ROCKCRAFT_CACHE_KEY=$ROCKCRAFT_CACHE_KEY_BASE&date=${TODAY}" >> $GITHUB_ENV
           echo 'ROCKCRAFT_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
-            do echo "$ROCKCRAFT_CACHE_KEY_BASE&date=$(date -d"-$d days" +%Y-%m-%d)" >> $GITHUB_ENV
+            do echo "$ROCKCRAFT_CACHE_KEY_BASE&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
-          echo "ROCK_CACHE_KEY=$ROCK_CACHE_KEY_BASE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+          echo "ROCK_CACHE_KEY=$ROCK_CACHE_KEY_BASE&date=${TODAY}" >> $GITHUB_ENV
           echo 'ROCK_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
-            do echo "$ROCK_CACHE_KEY_BASE&date=$(date -d"-$d days" +%Y-%m-%d)" >> $GITHUB_ENV
+            do echo "$ROCK_CACHE_KEY_BASE&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
       - name: Generate Go cache keys
@@ -314,10 +319,10 @@ jobs:
           if [ "${{ inputs.multiarch-awareness }}" == "true" ]; then
             GO_MOD_CACHE_KEY_BASE="${GO_MOD_CACHE_KEY_BASE}&arch=${{ env.IMAGE_ARCH }}"
           fi
-          echo "GO_MOD_CACHE_KEY=${GO_MOD_CACHE_KEY_BASE}&date=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+          echo "GO_MOD_CACHE_KEY=${GO_MOD_CACHE_KEY_BASE}&date=${TODAY}" >> $GITHUB_ENV
           echo 'GO_MOD_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
-            do echo "${GO_MOD_CACHE_KEY_BASE}&date=$(date -d"-$d days" +%Y-%m-%d)" >> $GITHUB_ENV
+            do echo "${GO_MOD_CACHE_KEY_BASE}&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
           
@@ -326,16 +331,16 @@ jobs:
           if [ "${{ inputs.multiarch-awareness }}" == "true" ]; then
             GO_BUILD_CACHE_KEY_BASE="${GO_BUILD_CACHE_KEY_BASE}&arch=${{ env.IMAGE_ARCH }}"
           fi
-          echo "GO_BUILD_CACHE_KEY=${GO_BUILD_CACHE_KEY_BASE}&date=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+          echo "GO_BUILD_CACHE_KEY=${GO_BUILD_CACHE_KEY_BASE}&date=${TODAY}" >> $GITHUB_ENV
           echo 'GO_BUILD_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
-            do echo "${GO_BUILD_CACHE_KEY_BASE}&date=$(date -d"-$d days" +%Y-%m-%d)" >> $GITHUB_ENV
+            do echo "${GO_BUILD_CACHE_KEY_BASE}&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
           
           echo "Go cache keys generated for Rock: ${{ env.IMAGE_NAME }}"
-          echo "  Go module cache key: ${GO_MOD_CACHE_KEY_BASE}&date=$(date +%Y-%m-%d)"
-          echo "  Go build cache key: ${GO_BUILD_CACHE_KEY_BASE}&date=$(date +%Y-%m-%d)"
+          echo "  Go module cache key: ${GO_MOD_CACHE_KEY_BASE}&date=${TODAY}"
+          echo "  Go build cache key: ${GO_BUILD_CACHE_KEY_BASE}&date=${TODAY}"
       - name: Restore rock cache
         if: inputs.cache-action == 'restore'
         uses: actions/cache/restore@v4.2.0

@@ -1,6 +1,5 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
-
 name: Build images
 
 on:
@@ -67,6 +66,22 @@ on:
           example)
             arch-skipping-maximize-build-space: '["arm64"]'
         default: '[]'
+      build-env:
+        type: string
+        description: |-
+          JSON mapping of environment variables to set during the build process.
+          Useful for configuring build tools like Go proxy settings.
+          
+          example)
+            build-env: '{"GOPROXY": "https://proxy.golang.org,direct", "GOSUMDB": "sum.golang.org"}'
+        default: '{}'
+      enable-go-caching:
+        type: boolean
+        description: |-
+          Enable or disable Go module and build caching.
+          When enabled, Go dependencies and build artifacts are cached between workflow runs
+          to reduce network requests and improve build reliability on self-hosted runners.
+        default: true
     secrets:
       UBUNTU_PRO_TOKEN:
         required: false
@@ -250,6 +265,11 @@ jobs:
           echo "IMAGE_REF=$IMAGE_REF" >> $GITHUB_ENV
           echo "IMAGE_ARCH=$IMAGE_ARCH" >> $GITHUB_ENV
           echo "ROCKCRAFT_CONTAINER_NAME=$ROCKCRAFT_CONTAINER_NAME" >> $GITHUB_ENV
+      - name: Compute stable cache date
+        run: |
+          # Use a single, stable UTC date across all cache keys
+          TODAY=$(date -u +%Y-%m-%d)
+          echo "TODAY=$TODAY" >> $GITHUB_ENV
       - name: Generate rockcraft cache key
         run: |
           ROCKCRAFT_PATH="${{ matrix.rock.path }}"
@@ -260,18 +280,67 @@ jobs:
             ROCKCRAFT_CACHE_KEY_BASE="${ROCKCRAFT_CACHE_KEY_BASE}&arch=${{ env.IMAGE_ARCH }}"
             ROCK_CACHE_KEY_BASE="${ROCK_CACHE_KEY_BASE}&arch=${{ env.IMAGE_ARCH }}"
           fi
-          echo "ROCKCRAFT_CACHE_KEY=$ROCKCRAFT_CACHE_KEY_BASE&date=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+          echo "ROCKCRAFT_CACHE_KEY=$ROCKCRAFT_CACHE_KEY_BASE&date=${TODAY}" >> $GITHUB_ENV
           echo 'ROCKCRAFT_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
-            do echo "$ROCKCRAFT_CACHE_KEY_BASE&date=$(date -d"-$d days" +%Y-%m-%d)" >> $GITHUB_ENV
+            do echo "$ROCKCRAFT_CACHE_KEY_BASE&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
-          echo "ROCK_CACHE_KEY=$ROCK_CACHE_KEY_BASE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+          echo "ROCK_CACHE_KEY=$ROCK_CACHE_KEY_BASE&date=${TODAY}" >> $GITHUB_ENV
           echo 'ROCK_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
-            do echo "$ROCK_CACHE_KEY_BASE&date=$(date -d"-$d days" +%Y-%m-%d)" >> $GITHUB_ENV
+            do echo "$ROCK_CACHE_KEY_BASE&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
+      - name: Generate Go cache keys
+        if: inputs.enable-go-caching == true
+        run: |
+          ROCKCRAFT_PATH="${{ matrix.rock.path }}"
+          ROCKCRAFT_PATH="${ROCKCRAFT_PATH%/}"
+          
+          # Check if Rock uses Go
+          if [ -f "${{ matrix.rock.path }}/go.mod" ]; then
+            echo "GO_DETECTED=true" >> $GITHUB_ENV
+            GOMOD_HASH=$(sha256sum "${{ matrix.rock.path }}/go.mod" | cut -d' ' -f1 | cut -c1-8)
+            GOSUM_HASH=""
+            if [ -f "${{ matrix.rock.path }}/go.sum" ]; then
+              GOSUM_HASH=$(sha256sum "${{ matrix.rock.path }}/go.sum" | cut -d' ' -f1 | cut -c1-8)
+            fi
+            echo "GOMOD_HASH=$GOMOD_HASH" >> $GITHUB_ENV
+            echo "GOSUM_HASH=$GOSUM_HASH" >> $GITHUB_ENV
+          else
+            echo "GO_DETECTED=false" >> $GITHUB_ENV
+            GOMOD_HASH="nogomod"
+            GOSUM_HASH="nogosum"
+          fi
+          
+          # Generate Go module cache key
+          GO_MOD_CACHE_KEY_BASE="$ROCKCRAFT_PATH/go-mod-cache?name=${{ env.IMAGE_NAME }}&gomod=${GOMOD_HASH}&gosum=${GOSUM_HASH}"
+          if [ "${{ inputs.multiarch-awareness }}" == "true" ]; then
+            GO_MOD_CACHE_KEY_BASE="${GO_MOD_CACHE_KEY_BASE}&arch=${{ env.IMAGE_ARCH }}"
+          fi
+          echo "GO_MOD_CACHE_KEY=${GO_MOD_CACHE_KEY_BASE}&date=${TODAY}" >> $GITHUB_ENV
+          echo 'GO_MOD_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
+          for d in {1..2}
+            do echo "${GO_MOD_CACHE_KEY_BASE}&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
+          done
+          echo 'EOF' >> $GITHUB_ENV
+          
+          # Generate Go build cache key
+          GO_BUILD_CACHE_KEY_BASE="$ROCKCRAFT_PATH/go-build-cache?name=${{ env.IMAGE_NAME }}&gomod=${GOMOD_HASH}&gosum=${GOSUM_HASH}"
+          if [ "${{ inputs.multiarch-awareness }}" == "true" ]; then
+            GO_BUILD_CACHE_KEY_BASE="${GO_BUILD_CACHE_KEY_BASE}&arch=${{ env.IMAGE_ARCH }}"
+          fi
+          echo "GO_BUILD_CACHE_KEY=${GO_BUILD_CACHE_KEY_BASE}&date=${TODAY}" >> $GITHUB_ENV
+          echo 'GO_BUILD_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
+          for d in {1..2}
+            do echo "${GO_BUILD_CACHE_KEY_BASE}&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
+          done
+          echo 'EOF' >> $GITHUB_ENV
+          
+          echo "Go cache keys generated for Rock: ${{ env.IMAGE_NAME }}"
+          echo "  Go module cache key: ${GO_MOD_CACHE_KEY_BASE}&date=${TODAY}"
+          echo "  Go build cache key: ${GO_BUILD_CACHE_KEY_BASE}&date=${TODAY}"
       - name: Restore rock cache
         if: inputs.cache-action == 'restore'
         uses: actions/cache/restore@v4.2.0
@@ -288,6 +357,42 @@ jobs:
           path: ~/.rockcraft-cache/
           key: ${{ env.ROCKCRAFT_CACHE_KEY }}
           restore-keys: ${{ env.ROCKCRAFT_CACHE_ALT_KEYS }}
+      - name: Restore Go module cache
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
+        uses: actions/cache/restore@v4.2.0
+        id: go-mod-cache
+        continue-on-error: true
+        with:
+          path: ~/.go-mod-cache/${{ env.IMAGE_NAME }}/
+          key: ${{ env.GO_MOD_CACHE_KEY }}
+          restore-keys: ${{ env.GO_MOD_CACHE_ALT_KEYS }}
+      - name: Log Go module cache status
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
+        run: |
+          if [ "${{ steps.go-mod-cache.outputs.cache-hit }}" == "true" ]; then
+            echo "✓ Go module cache hit for key: ${{ env.GO_MOD_CACHE_KEY }}"
+          else
+            echo "✗ Go module cache miss for key: ${{ env.GO_MOD_CACHE_KEY }}"
+            echo "  Will download dependencies from Go proxy during build"
+          fi
+      - name: Restore Go build cache
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
+        uses: actions/cache/restore@v4.2.0
+        id: go-build-cache
+        continue-on-error: true
+        with:
+          path: ~/.go-build-cache/${{ env.IMAGE_NAME }}/
+          key: ${{ env.GO_BUILD_CACHE_KEY }}
+          restore-keys: ${{ env.GO_BUILD_CACHE_ALT_KEYS }}
+      - name: Log Go build cache status
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && (inputs.cache-action == 'restore' || inputs.cache-action == 'save')
+        run: |
+          if [ "${{ steps.go-build-cache.outputs.cache-hit }}" == "true" ]; then
+            echo "✓ Go build cache hit for key: ${{ env.GO_BUILD_CACHE_KEY }}"
+          else
+            echo "✗ Go build cache miss for key: ${{ env.GO_BUILD_CACHE_KEY }}"
+            echo "  Will recompile Go packages during build"
+          fi
       - name: Setup LXD
         uses: canonical/setup-lxd@v0.1.3
       - name: Import rockcraft container cache
@@ -305,16 +410,122 @@ jobs:
         if: matrix.rock.rockcraft-revision == ''
         run: |
           sudo snap install rockcraft --classic --stable
+      - name: Create Go cache directories
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true'
+        run: |
+          mkdir -p ~/.go-mod-cache/${{ env.IMAGE_NAME }}
+          mkdir -p ~/.go-build-cache/${{ env.IMAGE_NAME }}
+          echo "Created Go cache directories:"
+          echo "  Module cache: ~/.go-mod-cache/${{ env.IMAGE_NAME }}"
+          echo "  Build cache: ~/.go-build-cache/${{ env.IMAGE_NAME }}"
+      - name: Mount Go caches into LXD container
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
+        continue-on-error: true
+        run: |
+          # Wait for container to be ready (it may be starting from cache import)
+          for i in {1..30}; do
+            if sudo lxc --project rockcraft info ${{ env.ROCKCRAFT_CONTAINER_NAME }} 2>/dev/null | grep -q "Status: Running\|Status: Stopped"; then
+              echo "Container ${{ env.ROCKCRAFT_CONTAINER_NAME }} is ready"
+              break
+            fi
+            echo "Waiting for container to be ready... ($i/30)"
+            sleep 2
+          done
+          
+          # Get absolute paths for cache directories
+          GO_MOD_CACHE_PATH=$(readlink -f ~/.go-mod-cache/${{ env.IMAGE_NAME }})
+          GO_BUILD_CACHE_PATH=$(readlink -f ~/.go-build-cache/${{ env.IMAGE_NAME }})
+          
+          # Add disk devices to mount Go caches
+          echo "Mounting Go module cache: $GO_MOD_CACHE_PATH -> /root/go/pkg/mod"
+          sudo lxc --project rockcraft config device add ${{ env.ROCKCRAFT_CONTAINER_NAME }} go-mod-cache disk \
+            source="$GO_MOD_CACHE_PATH" \
+            path=/root/go/pkg/mod || echo "Warning: Failed to mount Go module cache, continuing anyway"
+          
+          echo "Mounting Go build cache: $GO_BUILD_CACHE_PATH -> /root/.cache/go-build"
+          sudo lxc --project rockcraft config device add ${{ env.ROCKCRAFT_CONTAINER_NAME }} go-build-cache disk \
+            source="$GO_BUILD_CACHE_PATH" \
+            path=/root/.cache/go-build || echo "Warning: Failed to mount Go build cache, continuing anyway"
+          
+          echo "✓ Go caches mounted into LXD container"
       - name: Build rock with Pro features
         if: inputs.enabled-ubuntu-pro-features != '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
         working-directory: ${{ matrix.rock.path }}
+        env: ${{ fromJSON(inputs.build-env) }}
         run: |
-          sudo rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}
+          # Configure Go environment variables
+          if [ "${{ inputs.enable-go-caching }}" == "true" ] && [ "${{ env.GO_DETECTED }}" == "true" ]; then
+            export GOMODCACHE=/root/go/pkg/mod
+            export GOCACHE=/root/.cache/go-build
+            export GOPROXY=https://proxy.golang.org,direct
+            export GOSUMDB=sum.golang.org
+            echo "Go caching enabled with:"
+            echo "  GOMODCACHE=$GOMODCACHE"
+            echo "  GOCACHE=$GOCACHE"
+            echo "  GOPROXY=$GOPROXY"
+          else
+            export GOPROXY=direct
+          fi
+          
+          # Retry logic for EOF and network errors
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Build attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
+            if sudo -E rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}; then
+              echo "✓ Build succeeded"
+              break
+            else
+              EXIT_CODE=$?
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⚠ Build failed with exit code $EXIT_CODE, retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "✗ Build failed after $MAX_RETRIES attempts"
+                exit $EXIT_CODE
+              fi
+            fi
+          done
       - name: Build rock
         if: inputs.enabled-ubuntu-pro-features == '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
         working-directory: ${{ matrix.rock.path }}
+        env: ${{ fromJSON(inputs.build-env) }}
         run: |
-          sudo rockcraft pack
+          # Configure Go environment variables
+          if [ "${{ inputs.enable-go-caching }}" == "true" ] && [ "${{ env.GO_DETECTED }}" == "true" ]; then
+            export GOMODCACHE=/root/go/pkg/mod
+            export GOCACHE=/root/.cache/go-build
+            export GOPROXY=https://proxy.golang.org,direct
+            export GOSUMDB=sum.golang.org
+            echo "Go caching enabled with:"
+            echo "  GOMODCACHE=$GOMODCACHE"
+            echo "  GOCACHE=$GOCACHE"
+            echo "  GOPROXY=$GOPROXY"
+          else
+            export GOPROXY=direct
+          fi
+          
+          # Retry logic for EOF and network errors
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "Build attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
+            if sudo -E rockcraft pack; then
+              echo "✓ Build succeeded"
+              break
+            else
+              EXIT_CODE=$?
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⚠ Build failed with exit code $EXIT_CODE, retrying in 10 seconds..."
+                sleep 10
+              else
+                echo "✗ Build failed after $MAX_RETRIES attempts"
+                exit $EXIT_CODE
+              fi
+            fi
+          done
       - name: Generate rockcraft container cache
         if: inputs.cache-action == 'save'
         run: |
@@ -368,6 +579,66 @@ jobs:
         with:
           path: ~/.rock-cache
           key: ${{ env.ROCK_CACHE_KEY }}
+      - name: Delete Go module cache
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Deleting old Go module cache entries..."
+          gh api \
+            --method DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${{ github.repository }}/actions/caches?key=$(printf %s "${{ env.GO_MOD_CACHE_KEY }}"|jq -sRr @uri) || :
+          for key in $(echo $GO_MOD_CACHE_ALT_KEYS)
+            do gh api \
+              --method DELETE \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              /repos/${{ github.repository }}/actions/caches?key=$(printf %s "$key"|jq -sRr @uri) || :
+          done
+      - name: Save Go module cache
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
+        uses: actions/cache/save@v4.2.0
+        continue-on-error: true
+        with:
+          path: ~/.go-mod-cache/${{ env.IMAGE_NAME }}/
+          key: ${{ env.GO_MOD_CACHE_KEY }}
+      - name: Log Go module cache save
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
+        run: |
+          echo "✓ Saved Go module cache with key: ${{ env.GO_MOD_CACHE_KEY }}"
+      - name: Delete Go build cache
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Deleting old Go build cache entries..."
+          gh api \
+            --method DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            /repos/${{ github.repository }}/actions/caches?key=$(printf %s "${{ env.GO_BUILD_CACHE_KEY }}"|jq -sRr @uri) || :
+          for key in $(echo $GO_BUILD_CACHE_ALT_KEYS)
+            do gh api \
+              --method DELETE \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              /repos/${{ github.repository }}/actions/caches?key=$(printf %s "$key"|jq -sRr @uri) || :
+          done
+      - name: Save Go build cache
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
+        uses: actions/cache/save@v4.2.0
+        continue-on-error: true
+        with:
+          path: ~/.go-build-cache/${{ env.IMAGE_NAME }}/
+          key: ${{ env.GO_BUILD_CACHE_KEY }}
+      - name: Log Go build cache save
+        if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true' && inputs.cache-action == 'save'
+        run: |
+          echo "✓ Saved Go build cache with key: ${{ env.GO_BUILD_CACHE_KEY }}"
       - name: Upload rock to ${{ inputs.registry }}
         if: steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save'
         run: |

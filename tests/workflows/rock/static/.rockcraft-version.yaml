@@ -1,0 +1,7 @@
+versions:
+  - architecture: amd64
+    channel: latest/stable
+  - architecture: arm64
+    channel: latest/stable
+
+pro-features: disabled

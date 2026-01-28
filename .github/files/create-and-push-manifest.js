@@ -91,7 +91,7 @@ async function main(rockMetas, registry, dryRun) {
     const metas = rockMetas
     const containers = {}
     for (const meta of metas) {
-        let key = [meta.name, meta.version]
+        let key = [meta.name, meta.version, meta.variant || '']
         if (!containers.hasOwnProperty(key)) {
             containers[key] = new RockComponent(meta.name, meta.version, dryRun)
         }

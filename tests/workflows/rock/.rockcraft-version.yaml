@@ -1,0 +1,16 @@
+# .rockcraft-version.yaml
+# Specifies which version of Rockcraft should be used for builds
+# This file is resolved by proximity to rockcraft.yaml, searching from bottom to top.
+
+versions:
+  - architecture: amd64
+    channel: latest/stable
+  - architecture: arm64
+    channel: latest/stable
+
+# Control Pro features (optional)
+# Values:
+#   - "disabled": Skip Pro features for this rock (even if workflow input enables them)
+#   - "<feature-list>": Override with specific features (e.g., "fips-updates")
+#   - omit: Use workflow input default
+# pro-features: disabled

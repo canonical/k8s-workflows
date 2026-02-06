@@ -53,6 +53,16 @@ on:
           The key should be one of the platforms in rockcraft.yaml (amd64, arm64...)
           The values should be a revision
           If the key is missing for a discovered architecture, the revision will be ''
+
+          Priority order for rockcraft version resolution (highest to lowest):
+          1. .rockcraft-version.yaml next to the rockcraft.yaml file
+          2. .rockcraft-version.yaml in parent directories (walking up the tree)
+          3. .rockcraft-version.yaml at the repository root
+          4. This workflow input (rockcraft-revisions)
+
+          If a .rockcraft-version.yaml file specifies either a revision or channel
+          for the architecture, it takes precedence and this input is ignored.
+          If none is specified, it defaults to 'latest/stable'.
         default: '{}'
       arch-skipping-maximize-build-space:
         type: string
@@ -93,10 +103,10 @@ on:
         description: List of images built
         value: ${{ jobs.get-rocks.outputs.images }}
       rock-metas:
-        description: List of maps featuring the built {name, version, path, arch, image}
+        description: List of maps featuring the built {name, version, path, arch, image, variant}
         value: ${{ jobs.get-rocks.outputs.rock-metas }}
       changed-rock-metas:
-        description: List of maps featuring the built that has changed {name, version, path, arch, image}
+        description: List of maps featuring the built that has changed {name, version, path, arch, image, variant}
         value: ${{ jobs.get-rocks.outputs.changed-rock-metas }}
 
 jobs:
@@ -123,12 +133,18 @@ jobs:
           filters: |
             rocks:
               - '**/rockcraft.yaml'
+      - uses: actions/setup-node@v4
+      - name: Install JavaScript dependencies
+        run: npm install js-yaml
       - name: Generate rock paths and images
         id: gen-rock-paths-and-images
         uses: actions/github-script@v7.0.1
         with:
           script: |
+            const fs = require('fs')
             const path = require('path')
+            const yaml = require('js-yaml')
+
             const inputs = ${{ toJSON(inputs) }}
             const workingDir = inputs['working-directory']
             const multiarch = inputs['multiarch-awareness']
@@ -146,29 +162,98 @@ jobs:
             const rockcraftRevisions = JSON.parse(inputs['rockcraft-revisions'])
             const isPullRequest = ${{ github.event_name == 'pull_request' }}
             core.info(`Multiarch Awareness is ${multiarch ? "on" : "off"}`)
-            for (const rockcraftFile of await rockcraftGlobber.glob()) {
+
+            async function detectVariant(rockcraftFile, allRockcraftFiles) {
+                const dir = path.dirname(rockcraftFile)
+                const parentDir = path.dirname(dir)
+                const parentRockcraft = path.join(parentDir, 'rockcraft.yaml')
+                if (allRockcraftFiles.includes(parentRockcraft)) {
+                    return path.basename(dir)
+                }
+                return null
+            }
+
+            async function resolveRockcraftVersion(rockPath, arch) {
+                let currentDir = rockPath === './' ? '.' : rockPath
+                let proFeatures = null  // null means use workflow default
+
+                while (currentDir && currentDir !== '..' && !currentDir.startsWith('..')) {
+                    const versionFile = path.join(currentDir, '.rockcraft-version.yaml')
+                    try {
+                        const content = fs.readFileSync(versionFile, 'utf-8');
+                        const config = yaml.load(content)
+                        core.info(`found .rockcraft-version.yaml in ${currentDir}`)
+
+                        // Read pro-features setting (only once from nearest file)
+                        if (proFeatures === null && config['pro-features']) {
+                            proFeatures = config['pro-features'];
+                            core.info(`resolved pro-features: ${proFeatures}`)
+                        }
+
+                        const archConfig = (config.versions || []).find(v => v.architecture === arch);
+                        if (archConfig) {
+                            core.info(`resolved rockcraft version for ${arch}: revision=${archConfig.revision || ''}, channel=${archConfig.channel || ''}`)
+                            return {
+                                revision: archConfig.revision || '',
+                                channel: archConfig.channel || '',
+                                proFeatures: proFeatures
+                            }
+                        }
+                    } catch (e) {
+                        // File doesn't exist, continue searching up
+                    }
+
+                    const parentDir = path.dirname(currentDir)
+                    if (parentDir === currentDir || parentDir === '.') {
+                        break
+                    }
+                    currentDir = parentDir
+                }
+
+                return { revision: '', channel: '', proFeatures: proFeatures }
+            }
+
+            const allRockcraftFiles = await rockcraftGlobber.glob()
+
+            for (const rockcraftFile of allRockcraftFiles) {
                 const rockPath = path.relative('.', path.dirname(rockcraftFile)) || "./"
                 core.info(`found rockcraft.yaml in ${rockPath}`)
                 const fileHash = await glob.hashFiles(path.join(rockPath, '**'))
-                const [rockName, rockVersion] = (
-                    await exec.getExecOutput('yq', ['.name,.version', rockcraftFile])
-                ).stdout.trim().split("\n")
-                const platforms = (
-                    await exec.getExecOutput('yq', ['.platforms | keys', '-o=json', rockcraftFile])
-                ).stdout.trim()
-                if (multiarch && platforms) {
-                    const arches = JSON.parse(platforms)
+
+                const rockcraft = yaml.load(fs.readFileSync(rockcraftFile, 'utf-8'));
+                const rockName = rockcraft.name;
+                const rockVersion = rockcraft.version;
+
+                const variant = await detectVariant(rockcraftFile, allRockcraftFiles)
+                if (variant) {
+                    core.info(`detected variant: ${variant} for ${rockName}`)
+                }
+                if (multiarch && rockcraft.platforms) {
+                    const arches = Object.keys(rockcraft.platforms || {});
                     for (arch of arches) {
                         const image = `${{inputs.registry}}/${{inputs.owner}}/${rockName}:${fileHash}-${arch}`
                         core.info(`generate multi-arch image name: ${image}`)
                         images.push(image)
+
+                        // Resolve rockcraft version: .rockcraft-version.yaml takes precedence over input
+                        // Only fall back to workflow input if no revision or channel was found
+                        const rockcraftVersionConfig = await resolveRockcraftVersion(rockPath, arch)
+                        const foundVersionConfig = rockcraftVersionConfig.revision || rockcraftVersionConfig.channel
+                        const rockcraftRevision = foundVersionConfig
+                            ? rockcraftVersionConfig.revision
+                            : (rockcraftRevisions[arch] || '')
+                        const rockcraftChannel = rockcraftVersionConfig.channel || ''
+
                         const meta = {
                             name: rockName,
                             version: rockVersion,
                             path: rockPath,
                             arch: arch,
                             image: image,
-                            "rockcraft-revision": rockcraftRevisions[arch] || '',
+                            variant: variant || '',
+                            "rockcraft-revision": rockcraftRevision,
+                            "rockcraft-channel": rockcraftChannel,
+                            "pro-features": rockcraftVersionConfig.proFeatures,
                             "runs-on-labels": platformLabels[arch] || [inputs["runs-on"]]
                         }
                         rockMetas.push(meta)
@@ -183,13 +268,26 @@ jobs:
                     const image = `${{inputs.registry}}/${{inputs.owner}}/${rockName}:${fileHash}`
                     core.info(`generate image name: ${image}`)
                     images.push(image)
+
+                    // Resolve rockcraft version: .rockcraft-version.yaml takes precedence over input
+                    // Only fall back to workflow input if no revision or channel was found
+                    const rockcraftVersionConfig = await resolveRockcraftVersion(rockPath, defaultArch)
+                    const foundVersionConfig = rockcraftVersionConfig.revision || rockcraftVersionConfig.channel
+                    const rockcraftRevision = foundVersionConfig
+                        ? rockcraftVersionConfig.revision
+                        : (rockcraftRevisions[defaultArch] || '')
+                    const rockcraftChannel = rockcraftVersionConfig.channel || ''
+
                     const meta = {
                         name: rockName,
                         version: rockVersion,
                         path: rockPath,
                         arch: defaultArch,
                         image: image,
-                        "rockcraft-revision": rockcraftRevisions[defaultArch] || '',
+                        variant: variant || '',
+                        "rockcraft-revision": rockcraftRevision,
+                        "rockcraft-channel": rockcraftChannel,
+                        "pro-features": rockcraftVersionConfig.proFeatures,
                         "runs-on-labels": platformLabels[defaultArch] || [inputs["runs-on"]]
                     };
                     rockMetas.push(meta)
@@ -230,18 +328,6 @@ jobs:
       - name: Ensure LXD storage pools path
         run: |
           sudo mkdir -p /var/snap/lxd/common/lxd/storage-pools
-      - name: Maximize build space
-        if: ${{ !contains(fromJson(inputs.arch-skipping-maximize-build-space), matrix.rock.arch) }}
-        uses: easimon/maximize-build-space@v10
-        with:
-          root-reserve-mb: 2048
-          temp-reserve-mb: 2048
-          overprovision-lvm: 'true'
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-          build-mount-path: "/var/snap/lxd/common/lxd/storage-pools"
-          build-mount-path-ownership: "root:root"
       - uses: actions/checkout@v4.1.1
         with:
           fetch-depth: 0
@@ -283,13 +369,13 @@ jobs:
           echo "ROCKCRAFT_CACHE_KEY=$ROCKCRAFT_CACHE_KEY_BASE&date=${TODAY}" >> $GITHUB_ENV
           echo 'ROCKCRAFT_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
-            do echo "$ROCKCRAFT_CACHE_KEY_BASE&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
+            do echo "$ROCKCRAFT_CACHE_KEY_BASE&date=$(date -u -d "$TODAY - $d days" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
           echo "ROCK_CACHE_KEY=$ROCK_CACHE_KEY_BASE&date=${TODAY}" >> $GITHUB_ENV
           echo 'ROCK_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
-            do echo "$ROCK_CACHE_KEY_BASE&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
+            do echo "$ROCK_CACHE_KEY_BASE&date=$(date -u -d "$TODAY - $d days" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
       - name: Generate Go cache keys
@@ -322,7 +408,7 @@ jobs:
           echo "GO_MOD_CACHE_KEY=${GO_MOD_CACHE_KEY_BASE}&date=${TODAY}" >> $GITHUB_ENV
           echo 'GO_MOD_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
-            do echo "${GO_MOD_CACHE_KEY_BASE}&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
+            do echo "${GO_MOD_CACHE_KEY_BASE}&date=$(date -u -d "$TODAY - $d days" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
           
@@ -334,7 +420,7 @@ jobs:
           echo "GO_BUILD_CACHE_KEY=${GO_BUILD_CACHE_KEY_BASE}&date=${TODAY}" >> $GITHUB_ENV
           echo 'GO_BUILD_CACHE_ALT_KEYS<<EOF' >> $GITHUB_ENV
           for d in {1..2}
-            do echo "${GO_BUILD_CACHE_KEY_BASE}&date=$(date -u -d \"$TODAY -$d days\" +%Y-%m-%d)" >> $GITHUB_ENV
+            do echo "${GO_BUILD_CACHE_KEY_BASE}&date=$(date -u -d "$TODAY - $d days" +%Y-%m-%d)" >> $GITHUB_ENV
           done
           echo 'EOF' >> $GITHUB_ENV
           
@@ -402,14 +488,16 @@ jobs:
           sudo lxc project create rockcraft -c features.images=false -c features.profiles=false
           sudo lxc --project rockcraft import ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar ${{ env.ROCKCRAFT_CONTAINER_NAME }}
           find . -exec touch '{}' ';'
-      - name: Setup rockcraft with specific revision
-        if: matrix.rock.rockcraft-revision != ''
+      - name: Setup rockcraft
+        env:
+          REVISION: ${{ matrix.rock.rockcraft-revision }}
+          CHANNEL: ${{ matrix.rock.rockcraft-channel || 'latest/stable' }}
         run: |
-          sudo snap install rockcraft --classic --revision ${{ matrix.rock.rockcraft-revision }}
-      - name: Setup rockcraft stable
-        if: matrix.rock.rockcraft-revision == ''
-        run: |
-          sudo snap install rockcraft --classic --stable
+          if [[ -n "$REVISION" ]]; then
+            sudo snap install rockcraft --classic --revision "$REVISION"
+          else
+            sudo snap install rockcraft --classic --channel "$CHANNEL"
+          fi
       - name: Create Go cache directories
         if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true'
         run: |
@@ -448,51 +536,26 @@ jobs:
             path=/root/.cache/go-build || echo "Warning: Failed to mount Go build cache, continuing anyway"
           
           echo "✓ Go caches mounted into LXD container"
-      - name: Build rock with Pro features
-        if: inputs.enabled-ubuntu-pro-features != '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
-        working-directory: ${{ matrix.rock.path }}
-        env: ${{ fromJSON(inputs.build-env) }}
-        run: |
-          # Configure Go environment variables
-          if [ "${{ inputs.enable-go-caching }}" == "true" ] && [ "${{ env.GO_DETECTED }}" == "true" ]; then
-            export GOMODCACHE=/root/go/pkg/mod
-            export GOCACHE=/root/.cache/go-build
-            export GOPROXY=https://proxy.golang.org,direct
-            export GOSUMDB=sum.golang.org
-            echo "Go caching enabled with:"
-            echo "  GOMODCACHE=$GOMODCACHE"
-            echo "  GOCACHE=$GOCACHE"
-            echo "  GOPROXY=$GOPROXY"
-          else
-            export GOPROXY=direct
-          fi
-          
-          # Retry logic for EOF and network errors
-          MAX_RETRIES=3
-          RETRY_COUNT=0
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            echo "Build attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
-            if sudo -E rockcraft pack --pro=${{ inputs.enabled-ubuntu-pro-features }}; then
-              echo "✓ Build succeeded"
-              break
-            else
-              EXIT_CODE=$?
-              RETRY_COUNT=$((RETRY_COUNT + 1))
-              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                echo "⚠ Build failed with exit code $EXIT_CODE, retrying in 10 seconds..."
-                sleep 10
-              else
-                echo "✗ Build failed after $MAX_RETRIES attempts"
-                exit $EXIT_CODE
-              fi
-            fi
-          done
       - name: Build rock
-        if: inputs.enabled-ubuntu-pro-features == '' && (steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save')
+        if: steps.rock-cache.outputs.cache-hit != 'true' || inputs.cache-action == 'save'
         working-directory: ${{ matrix.rock.path }}
         env: ${{ fromJSON(inputs.build-env) }}
         run: |
-          # Configure Go environment variables
+          BUILD_CMD="sudo -E rockcraft pack"
+          PRO_FEATURES="${{ matrix.rock.pro-features }}"
+
+          if [[ "$PRO_FEATURES" != "disabled" ]]; then
+            if [[ -z "$PRO_FEATURES" || "$PRO_FEATURES" == "null" ]]; then
+              PRO_FEATURES="${{ inputs.enabled-ubuntu-pro-features }}"
+            fi
+            if [[ -n "$PRO_FEATURES" ]]; then
+              BUILD_CMD="sudo -E rockcraft pack --pro=$PRO_FEATURES"
+              echo "Using Ubuntu Pro features: $PRO_FEATURES"
+            fi
+          else
+            echo "Pro features disabled for this rock"
+          fi
+
           if [ "${{ inputs.enable-go-caching }}" == "true" ] && [ "${{ env.GO_DETECTED }}" == "true" ]; then
             export GOMODCACHE=/root/go/pkg/mod
             export GOCACHE=/root/.cache/go-build
@@ -505,13 +568,12 @@ jobs:
           else
             export GOPROXY=direct
           fi
-          
-          # Retry logic for EOF and network errors
+
           MAX_RETRIES=3
           RETRY_COUNT=0
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             echo "Build attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES"
-            if sudo -E rockcraft pack; then
+            if $BUILD_CMD; then
               echo "✓ Build succeeded"
               break
             else

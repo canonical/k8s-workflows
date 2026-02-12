@@ -323,8 +323,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ubuntu-advantage-tools
-          sudo sh -c 'echo "contract_url: https://contracts.staging.canonical.com" > /etc/ubuntu-advantage/uaclient.conf'
-          sudo pro attach ${{ secrets.UBUNTU_PRO_TOKEN }} --no-auto-enable
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # NOTE: Enable once staging is back
+            # sudo sh -c 'echo "contract_url: https://contracts.staging.canonical.com" > /etc/ubuntu-advantage/uaclient.conf'
+            # TOKEN=${{ secrets.UBUNTU_PRO_STAGING_TOKEN }}
+            TOKEN=${{ secrets.UBUNTU_PRO_TOKEN }}
+          else
+            TOKEN=${{ secrets.UBUNTU_PRO_TOKEN }}
+          fi
+          sudo pro attach $TOKEN --no-auto-enable
       - name: Ensure LXD storage pools path
         run: |
           sudo mkdir -p /var/snap/lxd/common/lxd/storage-pools

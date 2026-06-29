@@ -92,6 +92,13 @@ on:
           When enabled, Go dependencies and build artifacts are cached between workflow runs
           to reduce network requests and improve build reliability on self-hosted runners.
         default: true
+      force-build:
+        type: boolean
+        description: |-
+          Force building every discovered rock, even if an image with the same
+          content hash already exists in the registry. Useful for verification
+          runs where you want to rebuild all rocks regardless of cache.
+        default: false
     secrets:
       UBUNTU_PRO_TOKEN:
         required: false
@@ -160,6 +167,7 @@ jobs:
             const changesPaths = JSON.parse(changes['outputs']['rocks_files'])
             const platformLabels = JSON.parse(inputs['platform-labels'])
             const rockcraftRevisions = JSON.parse(inputs['rockcraft-revisions'])
+            const forceBuild = inputs['force-build']
             const isPullRequest = ${{ github.event_name == 'pull_request' }}
             core.info(`Multiarch Awareness is ${multiarch ? "on" : "off"}`)
 
@@ -258,7 +266,9 @@ jobs:
                         }
                         rockMetas.push(meta)
                         const imageExists = (await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true})).exitCode === 0
-                        if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || !imageExists)) {
+                        if (forceBuild) {
+                            changedMetas.push(meta)
+                        } else if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || !imageExists)) {
                             changedMetas.push(meta)
                         } else if (!isPullRequest) {
                             changedMetas.push(meta)
@@ -292,7 +302,9 @@ jobs:
                     };
                     rockMetas.push(meta)
                     const imageExists = (await exec.getExecOutput('docker', ['manifest', 'inspect', image], {ignoreReturnCode: true})).exitCode === 0
-                    if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || !imageExists)) {
+                    if (forceBuild) {
+                        changedMetas.push(meta)
+                    } else if (isPullRequest && (changesPaths.includes(`${rockPath}/rockcraft.yaml`) || !imageExists)) {
                         changedMetas.push(meta)
                     } else if (!isPullRequest) {
                         changedMetas.push(meta)

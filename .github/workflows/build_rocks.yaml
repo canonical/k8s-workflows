@@ -504,12 +504,15 @@ jobs:
           sudo lxc --project rockcraft import ~/.rockcraft-cache/${{ env.IMAGE_NAME }}.tar ${{ env.ROCKCRAFT_CONTAINER_NAME }}
           find . -exec touch '{}' ';'
       - name: Setup rockcraft
-        # TEMPORARY (verification only): force the rockcraft snap from the
-        # latest/edge/checkdowngrade branch to validate the FIPS libgcrypt20
-        # downgrade fix. This overrides the per-rock revision/channel and MUST
-        # be reverted before merging.
+        env:
+          REVISION: ${{ matrix.rock.rockcraft-revision }}
+          CHANNEL: ${{ matrix.rock.rockcraft-channel || 'latest/stable' }}
         run: |
-          sudo snap install rockcraft --classic --channel latest/edge/checkdowngrade
+          if [[ -n "$REVISION" ]]; then
+            sudo snap install rockcraft --classic --revision "$REVISION"
+          else
+            sudo snap install rockcraft --classic --channel "$CHANNEL"
+          fi
       - name: Create Go cache directories
         if: inputs.enable-go-caching == true && env.GO_DETECTED == 'true'
         run: |
